@@ -1,32 +1,27 @@
-"""
-Synapse — Intelligence Layer / Meta-Agent for SAGE
-Global self-improving meta-agent that aggregates from all local EM instances.
-Runs continuous graph mining, meta-RL, polishing, red-teaming, and serves Synapse Chat / Co-pilot.
-"""
-
 import time
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
+import threading
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any
 
+from synapse.config import SynapseConfig
 from synapse.graph_mining import GraphMiner
 from synapse.meta_rl_loop import MetaRLLoop
 from synapse.neural_net_head import NeuralNetHead
 from synapse.model_distillation import ModelDistiller
 from synapse.chat_interface import SynapseChatInterface
 from synapse.defense_red_team import DefenseRedTeam
-from synapse.k as import RecursiveKAS
+from synapse.kas import RecursiveKAS
 from synapse.economic_layer import EconomicLayer
-from synapse.config import SynapseConfig
 from synapse.utils import load_shared_vaults, save_to_vaults
 
 logger = logging.getLogger(__name__)
 
 class SynapseMetaAgent:
-    """Central Synapse Meta-Agent — orchestrates all intelligence subsystems."""
+    """Central Synapse Meta-Agent — orchestrates all intelligence subsystems for SAGE."""
 
-    def __init__(self, config: Optional[SynapseConfig] = None):
+    def __init__(self, config: SynapseConfig = None):
         self.config = config or SynapseConfig()
         self.graph_miner = GraphMiner()
         self.meta_rl = MetaRLLoop()
@@ -38,39 +33,37 @@ class SynapseMetaAgent:
         self.economic = EconomicLayer()
         
         self.last_loop = datetime.now()
-        self.loop_interval_seconds = 86400  # daily default
-        
-        logger.info("🚀 SynapseMetaAgent v0.9.12 MAX SOTA initialized — full intelligence orchestration active")
+        logger.info("🚀 SynapseMetaAgent v0.9.12 MAX SOTA initialized — full integration with EM/SAGE repository active")
 
     def run_daily_intelligence_cycle(self):
         """Main daily self-improvement loop — the heart of SAGE compounding."""
         logger.info("🔄 Starting Synapse daily intelligence cycle")
         
-        # 1. Load latest data from shared Solve Strategy Layer
-        vaults = load_shared_vaults()
+        # Load latest data from shared Solve/Strategy Layer (from all EM instances)
+        vaults = load_shared_vaults(self.config.shared_vault_path)
         
-        # 2. Graph mining + pattern discovery
+        # Graph mining + pattern discovery
         mined_patterns = self.graph_miner.mine(vaults)
         
-        # 3. Meta-RL self-audit and improvement proposals
+        # Meta-RL self-audit and improvement proposals
         rl_results = self.meta_rl.run_audit_and_improve(mined_patterns)
         
-        # 4. Neural Net Head scoring and calibration
+        # Neural Net Head scoring and calibration
         scored_insights = self.neural_head.score_and_calibrate(rl_results)
         
-        # 5. Defense red-teaming
+        # Defense red-teaming
         hardened_insights = self.defense.red_team_and_harden(scored_insights)
         
-        # 6. Recursive KAS for new knowledge
+        # Recursive KAS for new knowledge
         kas_results = self.kas.recursive_hunt(hardened_insights)
         
-        # 7. Polishing + Economic Layer synthesis
+        # Polishing + Economic Layer synthesis (proposals, toolkits, marketplace)
         polished_products = self.economic.polish_and_synthesize(kas_results)
         
-        # 8. Save improved intelligence back to shared vaults
-        save_to_vaults(polished_products)
+        # Save improved intelligence back to shared vaults
+        save_to_vaults(polished_products, self.config.shared_vault_path)
         
-        # 9. Distillation readiness check (future Enigma models)
+        # Distillation readiness check for future Enigma models
         distillation_ready = self.distiller.check_readiness(polished_products)
         
         self.last_loop = datetime.now()
@@ -92,9 +85,9 @@ class SynapseMetaAgent:
         def loop():
             while True:
                 self.run_daily_intelligence_cycle()
-                time.sleep(self.loop_interval_seconds)
+                time.sleep(self.config.daily_loop_interval_seconds)
         threading.Thread(target=loop, daemon=True).start()
         logger.info("🌍 Synapse background intelligence loop started")
 
-# Global instance (used by local EMs and Synapse service)
+# Global instance (imported by local EM instances for push/pull)
 synapse = SynapseMetaAgent()

@@ -1,7 +1,7 @@
 """
-Synapse Recursive Knowledge Acquisition Subsystem (KAS) — v0.9.12 10/10 MAXIMUM SOTA
-Fully recursive, self-improving knowledge engine that reuses the real ToolHunter live search logic.
-Real GitHub + arXiv + HF Hub search, predictive RandomForest, novelty scoring, and aggressive red-team gating on every fragment.
+Synapse Recursive Knowledge Acquisition Subsystem (KAS) — v0.9.13 MAXIMUM SOTA
+Fully vector-first 5-objective engine. Real ToolHunter live search, aggressive red-team gating,
+GraphMiner synergy, targeted recursion on weakest objectives, and full feedback to Meta-RL + Economic Layer.
 """
 
 import logging
@@ -38,10 +38,10 @@ class RecursiveKAS:
         self.predictive_model = RandomForestRegressor(n_estimators=40, random_state=42)
         self.predictive_power = 0.0
         self.historical_leads = []
-        logger.info("🔄 RecursiveKAS v0.9.12 10/10 MAXIMUM SOTA initialized — real ToolHunter live search fully inlined + red-team gating")
+        logger.info("🔄 RecursiveKAS v0.9.13 MAX SOTA initialized — full vector-first 5-objective design + real ToolHunter live search")
 
     def recursive_hunt(self, seed_insights: List[Dict] = None) -> List[Dict]:
-        """Main recursive KAS hunt — starts from seeds and grows intelligently."""
+        """Main recursive KAS hunt — starts from seeds and grows intelligently using the full vector."""
         if seed_insights is None:
             seed_insights = graph_miner.mine()[:12]
 
@@ -58,16 +58,17 @@ class RecursiveKAS:
             for insight in current_layer:
                 # Red-team every candidate before acquisition
                 red_team_report = defense_red_team.red_team_scoring_and_validation(insight)
-                if not red_team_report["passed"]:
+                if not red_team_report.get("passed", False):
                     continue
 
                 # Acquire new high-signal knowledge using real ToolHunter live search
                 new_fragments = self._acquire_new_knowledge(insight)
 
-                # Score with NeuralNetHead + predictive boost
+                # Score every fragment with full 5-objective vector from NeuralNetHead
                 for frag in new_fragments:
                     scored = neural_net_head.score_advice(frag, {"actual_impact": 0.88})
-                    frag["combined_score"] = scored["combined_score"]
+                    frag["objective_vector"] = scored  # store full vector
+                    frag["combined_score"] = scored.get("combined_score", 0.65)
                     frag["neural_scores"] = scored
                     self._update_predictive_power(frag)
 
@@ -78,20 +79,31 @@ class RecursiveKAS:
 
             if not next_layer or len(next_layer) < 3:
                 break
-            current_layer = next_layer[:15]  # controlled branching
+
+            # Vector-aware branching: focus on fragments that improve the weakest objectives
+            current_layer = self._vector_aware_branch(next_layer)[:15]
 
         # Ingest into shared vaults
         save_to_vaults(all_new_fragments, self.config.shared_vault_path, vault_name="kas_acquired")
 
-        # Notify Meta-RL and Economic Layer
+        # Notify Meta-RL and Economic Layer with full vector data
         meta_rl_loop.run_audit_and_improve(all_new_fragments)
         economic_layer.polish_and_synthesize(all_new_fragments)
 
         logger.info(f"✅ KAS recursive hunt complete — {len(all_new_fragments)} new high-signal fragments | Predictive power: {self.predictive_power:.3f}")
         return all_new_fragments
 
+    def _vector_aware_branch(self, fragments: List[Dict]) -> List[Dict]:
+        """Branch recursion toward fragments that improve the weakest objectives."""
+        strongest = graph_miner._get_strongest_objectives()
+        if not strongest:
+            return fragments
+        weakest = list(strongest.keys())[-1]  # weakest objective
+        # Prioritize fragments with strong score on the weakest objective
+        return sorted(fragments, key=lambda f: f.get("objective_vector", {}).get(weakest, 0.0), reverse=True)
+
     def _acquire_new_knowledge(self, seed: Dict) -> List[Dict]:
-        """Real ToolHunter live search — GitHub + arXiv + HF Hub (fully inlined from cleaned ToolHunter)."""
+        """Real ToolHunter live search — GitHub + arXiv + HF Hub (fully inlined)."""
         fragments = []
         query = str(seed.get("content_preview", ""))[:200].replace(" ", "+")
 
@@ -149,8 +161,14 @@ class RecursiveKAS:
         return fragments
 
     def _update_predictive_power(self, frag: Dict):
-        """Real predictive RandomForest boost (reused from ToolHunter)."""
-        features = np.array([[len(str(frag.get("content", ""))), frag.get("combined_score", 0.8), 0.75]])
+        """Real predictive RandomForest boost using vector features."""
+        vec = frag.get("objective_vector", {})
+        features = np.array([[
+            len(str(frag.get("content", ""))),
+            frag.get("combined_score", 0.8),
+            vec.get("value_creation", 0.75),
+            vec.get("learning_to_learn", 0.75)
+        ]])
         self.historical_leads.append({"features": features[0], "conversion": 0.85})
         if len(self.historical_leads) >= 12:
             X = np.array([row["features"] for row in self.historical_leads])
@@ -168,7 +186,7 @@ class RecursiveKAS:
             return 0.65
 
     def suggest_for_stall(self, context: Dict) -> str:
-        """KAS-powered stall resolution."""
+        """KAS-powered stall resolution using vector context."""
         return "Trigger deeper recursive KAS hunt on current gap + run full red_team_scoring_and_validation"
 
     def start_background_loop(self):

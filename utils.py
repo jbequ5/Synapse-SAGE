@@ -8,21 +8,21 @@ import json
 import logging
 import requests
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
 def _ipfs_add(data: bytes, config) -> Optional[str]:
     """Add data to IPFS and return CID."""
-    if not config.ipfs_enabled:
+    if not getattr(config, "ipfs_enabled", False):
         return None
     try:
         # Try local daemon API first
         r = requests.post(f"{config.ipfs_api}/api/v0/add", files={"file": data}, timeout=15)
         if r.status_code == 200:
             cid = r.json()["Hash"]
-            if config.ipfs_pin:
+            if getattr(config, "ipfs_pin", True):
                 requests.post(f"{config.ipfs_api}/api/v0/pin/add?arg={cid}", timeout=10)
             logger.info(f"📡 IPFS added & pinned → {cid}")
             return cid
@@ -59,7 +59,7 @@ def load_shared_vaults(base_path: str = "shared_vaults") -> Dict[str, List[Dict]
                     logger.debug(f"Failed to load {file}: {e}")
     return vaults
 
-def save_to_vaults(data: List[Dict], base_path: str = "shared_vaults", vault_name: str = "default") -> bool:
+def save_to_vaults(data: List[Dict], base_path: str = "shared_vaults", vault_name: str = "default", config=None) -> bool:
     """Save to local + IPFS with permanent CIDs in provenance."""
     if not data:
         return True
@@ -78,7 +78,7 @@ def save_to_vaults(data: List[Dict], base_path: str = "shared_vaults", vault_nam
         enriched = item.copy()
         # IPFS publish
         payload = json.dumps(enriched, indent=2).encode("utf-8")
-        cid = _ipfs_add(payload, None)  # config passed from caller in practice
+        cid = _ipfs_add(payload, config)
         if cid:
             ipfs_cids.append(cid)
             enriched["ipfs_cid"] = cid
@@ -105,7 +105,24 @@ def save_to_vaults(data: List[Dict], base_path: str = "shared_vaults", vault_nam
         logger.error(f"Failed to save to vault {vault_name}: {e}")
         return False
 
-# Legacy helpers (unchanged)
+def prune_old_vaults(base_path: str = "shared_vaults", max_age_days: int = 14):
+    """Lightweight nightly vault pruning — keeps only recent data."""
+    base_dir = Path(base_path)
+    cutoff = datetime.now() - timedelta(days=max_age_days)
+    pruned = 0
+    for vault_dir in base_dir.iterdir():
+        if vault_dir.is_dir():
+            for file in vault_dir.glob("*.json"):
+                try:
+                    if datetime.fromtimestamp(file.stat().st_mtime) < cutoff:
+                        file.unlink()
+                        pruned += 1
+                except Exception:
+                    pass
+    if pruned > 0:
+        logger.info(f"🧹 Pruned {pruned} old vault files older than {max_age_days} days")
+
+# Legacy helpers
 def get_latest_vault_file(vault_dir: Path) -> Optional[Path]:
     files = list(vault_dir.glob("*.json"))
     return max(files, key=lambda f: f.stat().st_mtime) if files else None
@@ -117,4 +134,4 @@ def semantic_similarity(a: Dict, b: Dict) -> float:
     words_b = set(text_b.lower().split())
     return len(words_a & words_b) / max(1, len(words_a | words_b)) if words_a and words_b else 0.0
 
-logger.info("🔧 Synapse Utils v0.9.12 with full IPFS distributed storage loaded — hybrid local + decentralized vaults active")
+logger.info("🔧 Synapse Utils v0.9.12 with full IPFS + pruning loaded — hybrid local + decentralized vaults active")

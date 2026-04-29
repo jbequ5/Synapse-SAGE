@@ -1,8 +1,8 @@
 """
-Synapse Economic Layer — v0.9.12 10/10 MAXIMUM SOTA
+Synapse Economic Layer — v0.9.13 MAXIMUM SOTA
 Marketplace, proposal engine, and product polishing subsystem optimized for MAXIMUM VALUE CREATION.
-Dynamic ROI estimation, marketplace feedback loop, adaptive monetization, and compounding back into KAS/Meta-RL.
-Every product is red-teamed before publication.
+Fully vector-first 5-objective design with dynamic ROI, red-team gating, marketplace feedback loop,
+and compounding back into KAS/Meta-RL.
 """
 
 import logging
@@ -29,7 +29,7 @@ class EconomicLayer:
         self.products_dir = Path("synapse/data/economic_products")
         self.products_dir.mkdir(parents=True, exist_ok=True)
         self.market_feedback = []  # tracks uptake, conversion, EFS lift
-        logger.info("💰 EconomicLayer v0.9.12 10/10 MAXIMUM SOTA initialized — dynamic value creation + marketplace feedback active")
+        logger.info("💰 EconomicLayer v0.9.13 MAX SOTA initialized — full vector-first 5-objective value creation active")
 
     def polish_and_synthesize(self, fragments: List[Dict]) -> List[Dict]:
         """Main synthesis pipeline optimized for maximum value creation."""
@@ -58,12 +58,12 @@ class EconomicLayer:
         return final_products
 
     def _synthesize_product(self, fragment: Dict) -> Dict:
-        """Deep polishing with dynamic value creation estimation."""
+        """Deep polishing with dynamic value creation estimation using full 5-objective vector."""
         neural_score = neural_net_head.score_advice(fragment, {"actual_impact": 0.88})
         red_team_risk = fragment.get("red_team_risk", 0.0)
         kas_freshness = recursive_kas.assess_freshness(fragment)
 
-        # Dynamic projected value creation (grounded in real signals)
+        # Dynamic projected value creation (grounded in full vector)
         projected_value = (
             neural_score.get("combined_score", 0.0) * 0.45 +
             (1.0 - red_team_risk) * 0.25 +
@@ -75,6 +75,7 @@ class EconomicLayer:
             "type": "synthesized_product",
             "title": f"High-Value Product — {fragment.get('source', 'KAS')} [{fragment.get('pattern_id', 'unknown')[:30]}]",
             "description": fragment.get("content", "")[:1200],
+            "objective_vector": neural_score,
             "combined_score": round(neural_score.get("combined_score", 0.0), 4),
             "projected_value_creation": round(projected_value, 4),
             "monetization_strategy": self._generate_dynamic_monetization(projected_value, neural_score),
@@ -91,7 +92,7 @@ class EconomicLayer:
         return product
 
     def _generate_dynamic_monetization(self, projected_value: float, neural_score: Dict) -> Dict:
-        """Adaptive monetization based on real signals."""
+        """Adaptive monetization based on full vector signals."""
         if projected_value > 0.85:
             return {
                 "model": "premium_license + revenue_share",

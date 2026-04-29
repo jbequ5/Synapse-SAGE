@@ -1,160 +1,155 @@
 """
-Synapse Chat Interface / Co-pilot — v0.9.12 MAXIMUM SOTA
-Tiered, proactive, secure conversational interface with grounded LLM wrapper.
-Integrates graph mining, Meta-RL, Neural Net Head, KAS, Defense, and Economic Layer.
+Synapse Core — v0.9.12 10/10 MAXIMUM SOTA
+Central orchestrator with full nightly intelligence cycle + lightweight additions
+(includes vault pruning, training data cleaning, market summary, health report).
 """
 
+import time
 import logging
-from typing import Dict, Any, List, Optional
+import threading
+import json
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, List
 
 from synapse.config import SynapseConfig
-from synapse.graph_mining import graph_miner
-from synapse.meta_rl_loop import meta_rl_loop
-from synapse.neural_net_head import neural_net_head
-from synapse.kas import recursive_kas
-from synapse.defense_red_team import defense_red_team
-from synapse.economic_layer import economic_layer
+from synapse.graph_mining import GraphMiner
+from synapse.meta_rl_loop import MetaRLLoop
+from synapse.neural_net_head import NeuralNetHead
+from synapse.model_distillation import ModelDistiller
+from synapse.chat_interface import SynapseChatInterface
+from synapse.defense_red_team import DefenseRedTeam
+from synapse.kas import RecursiveKAS
+from synapse.economic_layer import EconomicLayer
+from synapse.utils import load_shared_vaults, save_to_vaults, prune_old_vaults
 
 logger = logging.getLogger(__name__)
 
-class SynapseChatInterface:
-    """Synapse Chat / Co-pilot — tiered, proactive, secure interface with grounded LLM."""
+class SynapseMetaAgent:
+    """Central Synapse Meta-Agent — orchestrates all intelligence subsystems for SAGE."""
 
     def __init__(self, config: SynapseConfig = None):
         self.config = config or SynapseConfig()
-        logger.info(f"💬 SynapseChatInterface v0.9.12 MAX SOTA initialized — grounded LLM backend: {self.config.llm_backend} | model: {self.config.llm_model}")
+        self.graph_miner = GraphMiner()
+        self.meta_rl = MetaRLLoop()
+        self.neural_head = NeuralNetHead()
+        self.distiller = ModelDistiller()
+        self.chat = SynapseChatInterface()
+        self.defense = DefenseRedTeam()
+        self.kas = RecursiveKAS()
+        self.economic = EconomicLayer()
+        
+        self.last_loop = datetime.now()
+        logger.info("🚀 SynapseMetaAgent v0.9.12 MAX SOTA initialized — full nightly cycle + training data vault active")
 
-    def handle_query(self, user_query: str, user_tier: str = "standard",
-                     user_context: Dict = None, llm_model: Optional[str] = None) -> Dict[str, Any]:
-        """Main entry point for all user queries."""
-        if user_context is None:
-            user_context = {}
-
-        logger.info(f"💬 Synapse Chat query received — Tier: {user_tier} | Query: {user_query[:80]}...")
-
-        access_level = self._get_access_level(user_tier)
-
-        # Proactive stall / gap detection
-        if self._is_potential_stall(user_query, user_context):
-            return self._provide_proactive_stall_help(user_context, access_level)
-
-        # Process normal query
-        response = self._process_query(user_query, access_level, user_context, llm_model)
-
-        # Log for Meta-RL and Neural Net Head feedback
-        self._log_query_for_improvement(user_query, response, user_context, access_level)
-
-        return response
-
-    def _get_access_level(self, user_tier: str) -> str:
-        tiers = {
-            "standard": "basic",
-            "contributor": "enhanced",
-            "sponsor": "premium",
-            "alpha": "elite"
-        }
-        return tiers.get(user_tier.lower(), "basic")
-
-    def _is_potential_stall(self, query: str, context: Dict) -> bool:
-        stall_indicators = ["stuck", "stall", "failing", "not working", "error", "confused", "looping"]
-        return any(ind in query.lower() for ind in stall_indicators) or context.get("recent_efs", 0.0) < 0.55
-
-    def _provide_proactive_stall_help(self, context: Dict, access_level: str) -> Dict[str, Any]:
-        """Proactive stall resolution using Defense + KAS + Meta-RL."""
-        stall_analysis = defense_red_team.analyze_stall(context)
-        kas_suggestions = recursive_kas.suggest_for_stall(stall_analysis)
-        meta_advice = meta_rl_loop.run_audit_and_improve([])  # lightweight audit
-
-        return {
-            "status": "success",
-            "response": f"Detected potential stall. Here are targeted recommendations:\n{kas_suggestions}\n\nMeta-RL insight: {meta_advice.get('success_score', 0.75)}",
-            "type": "proactive_stall_help",
-            "confidence": 0.92,
-            "access_level": access_level
-        }
-
-    def _process_query(self, query: str, access_level: str, context: Dict, llm_model: Optional[str] = None) -> Dict[str, Any]:
-        """Core query processing with grounded LLM + retrieval fallback."""
-        lower_query = query.lower()
-
-        # Strategy request
-        if any(word in lower_query for word in ["strategy", "best way", "how to", "recommend", "approach"]):
-            return self._provide_strategy(query, access_level)
-
-        # Retrieve high-signal context
-        mined_insights = graph_miner.mine()[:8]
-        meta_results = meta_rl_loop.run_audit_and_improve(mined_insights)
-        neural_scores = neural_net_head.score_advice({"query": query}, {"actual_impact": 0.85})
-
-        # Try grounded LLM first
-        if self.config.llm_api_key or self.config.llm_backend in ["ollama", "local"]:
-            llm_response = self._generate_grounded_llm_response(query, mined_insights, meta_results, neural_scores, context, llm_model)
-            if llm_response.get("red_team_passed"):
-                return llm_response
-
-        # Fallback to retrieval-only response
-        return self._generate_retrieval_response(query, mined_insights, meta_results, neural_scores, access_level)
-
-    def _generate_grounded_llm_response(self, query: str, mined_insights: List[Dict],
-                                       meta_results: Dict, neural_scores: Dict,
-                                       context: Dict, llm_model: Optional[str] = None) -> Dict[str, Any]:
-        """Grounded LLM call — strictly limited to retrieved context + red-team validation."""
-        # TODO: Replace with your preferred client (openai, ollama, etc.)
-        # Example placeholder — in production import the actual client
-        raw_response = "[Grounded LLM would generate a rich, context-aware answer here using only the retrieved vault data]"
-
-        # Post-generation red-team validation
-        report = defense_red_team.red_team_scoring_and_validation({"content": raw_response})
-        if not report.get("passed", True):
-            return {"response": "Red-team blocked potentially unsafe response. Falling back to retrieval mode.", "red_team_passed": False}
+    def run_daily_intelligence_cycle(self):
+        """Main daily self-improvement loop — the heart of SAGE compounding."""
+        logger.info("🔄 Starting Synapse daily intelligence cycle")
+        
+        # Load latest data from shared Solve/Strategy Layer
+        vaults = load_shared_vaults(self.config.shared_vault_path)
+        
+        # Graph mining + pattern discovery
+        mined_patterns = self.graph_miner.mine(vaults)
+        
+        # Meta-RL self-audit and improvement proposals (includes nightly red-teaming)
+        rl_results = self.meta_rl.run_audit_and_improve(mined_patterns)
+        
+        # Neural Net Head scoring and calibration
+        scored_insights = self.neural_head.calibrate_from_history()
+        
+        # Defense red-teaming
+        hardened_insights = self.defense.red_team_and_harden(scored_insights)
+        
+        # Recursive KAS for new knowledge
+        kas_results = self.kas.recursive_hunt(hardened_insights)
+        
+        # Polishing + Economic Layer synthesis
+        polished_products = self.economic.polish_and_synthesize(kas_results)
+        
+        # Lightweight nightly maintenance tasks
+        self._run_lightweight_nightly_tasks(vaults, polished_products)
+        
+        # Save improved intelligence back to shared vaults
+        save_to_vaults(polished_products, self.config.shared_vault_path)
+        
+        # Distillation readiness check
+        distillation_ready = self.distiller.check_readiness(polished_products)
+        
+        self.last_loop = datetime.now()
+        logger.info(f"✅ Synapse daily cycle complete — {len(polished_products)} new/improved artifacts | Distillation ready: {distillation_ready}")
 
         return {
             "status": "success",
-            "response": raw_response,
-            "access_level": "elite",  # LLM responses are high-tier
+            "artifacts_generated": len(polished_products),
+            "distillation_ready": distillation_ready,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    def _run_lightweight_nightly_tasks(self, vaults: Dict, polished_products: List[Dict]):
+        """Lightweight nightly tasks: pruning, training data cleaning, market summary, health report."""
+        # Vault pruning
+        prune_old_vaults(self.config.shared_vault_path, max_age_days=14)
+
+        # Training Data Vault — intelligent nightly cleaning for Enigma model training
+        self._clean_and_prepare_training_data(vaults, polished_products)
+
+        # Market feedback aggregation + summary
+        summary = self.economic.get_market_summary()
+        logger.info(f"💰 Nightly market summary — Total value created: {summary.get('total_value_created', 0):.2f}")
+
+        # Swarm-wide health / provenance report
+        health_report = {
             "timestamp": datetime.now().isoformat(),
-            "sources": ["grounded_llm", "retrieved_vaults"],
-            "red_team_passed": True
+            "red_team_summary": self.defense.get_red_team_summary(),
+            "kas_fragments_added": len(polished_products),
+            "market_summary": summary
         }
+        save_to_vaults([health_report], self.config.shared_vault_path, vault_name="nightly_reports")
 
-    def _generate_retrieval_response(self, query: str, mined_insights: List[Dict],
-                                     meta_results: Dict, neural_scores: Dict, access_level: str) -> Dict[str, Any]:
-        """Pure retrieval fallback — always safe."""
-        top_insight = mined_insights[0] if mined_insights else {}
-        response_text = (
-            f"Based on current shared intelligence:\n"
-            f"{top_insight.get('content_preview', 'No strong patterns yet.')}\n\n"
-            f"Meta-RL success score: {meta_results.get('success_score', 0.75):.3f}\n"
-            f"Neural combined score: {neural_scores.get('combined_score', 0.0):.3f}"
-        )
+    def _clean_and_prepare_training_data(self, vaults: Dict, polished_products: List[Dict]):
+        """Nightly intelligent cleaning for Enigma model training data vault."""
+        training_dir = Path(self.config.training_data_vault_path)
+        training_dir.mkdir(parents=True, exist_ok=True)
 
-        return {
-            "status": "success",
-            "response": response_text,
-            "access_level": access_level,
-            "timestamp": datetime.now().isoformat(),
-            "sources": ["graph_mining", "meta_rl", "neural_head"],
-            "neural_combined_score": neural_scores.get("combined_score", 0.0)
-        }
+        clean_data = []
+        for vault_name, fragments in vaults.items():
+            for frag in fragments:
+                score = frag.get("combined_score", 0.0)
+                risk = frag.get("red_team_risk", 1.0)
+                freshness = self.kas.assess_freshness(frag)
 
-    def _provide_strategy(self, query: str, access_level: str) -> Dict[str, Any]:
-        """Deliver high-value strategy from latest mined insights."""
-        insights = graph_miner.mine()[:8]
-        best_strategy = max(insights, key=lambda x: x.get("combined_score", 0)) if insights else {}
+                if (score >= self.config.training_data_min_score and
+                    risk <= self.config.training_data_max_red_team_risk and
+                    freshness > 0.6):
+                    clean_data.append({
+                        "input": frag.get("content", ""),
+                        "target_score": score,
+                        "efs": frag.get("efs", 0.0),
+                        "verifier_quality": frag.get("verifier_quality", 0.0),
+                        "provenance": frag.get("provenance", {}),
+                        "timestamp": datetime.now().isoformat()
+                    })
 
-        return {
-            "status": "success",
-            "response": f"Best current strategy for your query:\n{best_strategy.get('content_preview', 'No strong patterns yet.')}\n\nCombined score: {best_strategy.get('combined_score', 0):.3f}",
-            "type": "strategy_recommendation",
-            "combined_score": best_strategy.get("combined_score", 0),
-            "access_level": access_level
-        }
+        if clean_data:
+            timestamp = datetime.now().isoformat().replace(":", "-")
+            (training_dir / f"training_batch_{timestamp}.json").write_text(
+                json.dumps(clean_data, indent=2), encoding="utf-8"
+            )
+            logger.info(f"📦 Training data vault cleaned — {len(clean_data)} high-quality samples prepared")
 
-    def _log_query_for_improvement(self, query: str, response: Dict, context: Dict, access_level: str):
-        """Log query and response for Meta-RL and Neural Net Head feedback."""
-        # In production this feeds the calibration loop
-        pass
+    def get_synapse_chat_response(self, user_query: str, user_tier: str = "standard") -> Dict[str, Any]:
+        """Synapse Chat / Co-pilot interface — tiered access to intelligence."""
+        return self.chat.handle_query(user_query, user_tier)
 
-# Global instance
-synapse_chat = SynapseChatInterface()
+    def start_background_loop(self):
+        """Start the continuous daily intelligence loop in background."""
+        def loop():
+            while True:
+                self.run_daily_intelligence_cycle()
+                time.sleep(self.config.daily_loop_interval_seconds)
+        threading.Thread(target=loop, daemon=True).start()
+        logger.info("🌍 Synapse background intelligence loop started (daily cycle + lightweight nightly tasks)")
+
+# Global instance (imported by local EM instances for push/pull)
+synapse = SynapseMetaAgent()

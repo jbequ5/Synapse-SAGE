@@ -15,7 +15,7 @@ from synapse.config import SynapseConfig
 from synapse.utils import load_shared_vaults, save_to_vaults
 from synapse.neural_net_head import neural_net_head
 from synapse.defense_red_team import defense_red_team
-from synapse.graph_mining import graph_miner   # ← New integration
+from synapse.graph_mining import graph_miner
 
 logger = logging.getLogger(__name__)
 
@@ -39,23 +39,18 @@ class MetaRLLoop:
         self.audit_history_path.write_text(json.dumps(self.audit_history, indent=2), encoding="utf-8")
 
     def run_audit_and_improve(self, mined_patterns: List[Dict] = None) -> Dict[str, Any]:
-        """Main meta-RL cycle — driven by full 5-objective vector from telemetry and GraphMiner."""
         logger.info("🔄 Running Meta-RL self-audit cycle")
 
-        # Get system-wide strongest/weakest objectives from GraphMiner
         strongest = graph_miner._get_strongest_objectives()
 
-        # Full 5-objective vector from NeuralNetHead (primary signal)
         neural_score = neural_net_head.score_advice(
             {"mined_patterns": len(mined_patterns or []), "strongest_objectives": strongest},
             self._perform_audit()
         )
 
-        # Red-team risk weighting on the full vector
         red_team_risk = self._perform_audit().get("red_team_risk", 0.0)
         final_success_score = neural_score["combined_score"] * (1.0 - red_team_risk * 0.3)
 
-        # Generate targeted proposals based on weakest objectives in the vector
         proposals = self._generate_vector_targeted_proposals(neural_score, strongest)
 
         calibration_result = neural_net_head.calibrate_from_history()
@@ -74,8 +69,7 @@ class MetaRLLoop:
         refined_strategies = self._prepare_refined_strategies(proposals)
         save_to_vaults(refined_strategies, self.config.shared_vault_path, vault_name="strategy")
 
-        logger.info(f"✅ Meta-RL cycle complete — Success Score: {final_success_score:.3f} | Red-team risk: {red_team_risk:.3f} | Weakest objective targeted: {proposals[0]['target'] if proposals else 'none'}")
-
+        logger.info(f"✅ Meta-RL cycle complete — Success Score: {final_success_score:.3f} | Weakest objective targeted: {proposals[0]['target'] if proposals else 'none'}")
         return {
             "status": "success",
             "success_score": final_success_score,
@@ -86,7 +80,6 @@ class MetaRLLoop:
         }
 
     def _perform_audit(self) -> Dict:
-        """Collect recent audit data for risk and context."""
         recent = self.audit_history[-50:] if len(self.audit_history) > 50 else self.audit_history
         return {
             "recent_advice_count": len(recent),
@@ -95,14 +88,12 @@ class MetaRLLoop:
         }
 
     def _generate_vector_targeted_proposals(self, neural_score: Dict, strongest: Dict) -> List[Dict]:
-        """Generate targeted proposals based on the weakest objectives in the full vector."""
         proposals = []
         objective_scores = {k: v for k, v in neural_score.items() 
                            if k in ["implementation_quality", "prediction_accuracy", "value_creation", "learning_to_learn", "robustness"]}
 
-        # Target the single weakest objective for high-signal, focused improvement
         for obj, score in sorted(objective_scores.items(), key=lambda x: x[1]):
-            if score < 0.78:  # tunable threshold
+            if score < 0.78:
                 proposals.append({
                     "target": obj,
                     "change": f"Improve {obj} (current: {score:.3f}) — system weakest objective",
@@ -110,11 +101,10 @@ class MetaRLLoop:
                     "priority": "high",
                     "system_strongest": list(strongest.keys())[:2]
                 })
-                break  # focus on the single most important gap
+                break
         return proposals
 
     def _prepare_refined_strategies(self, proposals: List[Dict]) -> List[Dict]:
-        """Prepare refined strategies for the shared strategy vault."""
         strategies = []
         for p in proposals:
             strategies.append({

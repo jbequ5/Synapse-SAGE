@@ -1,7 +1,8 @@
 """
-Synapse Graph Mining Subsystem
+Synapse Graph Mining Subsystem — v0.9.13 MAX SOTA
 NetworkX-based mining on shared Solve/Strategy Layer vaults.
-Discovers patterns, computes synergy, ranks insights, and feeds downstream subsystems.
+Vector-first 5-objective design (implementation_quality, prediction_accuracy,
+value_creation, learning_to_learn, robustness) for true intelligence amplification.
 """
 
 import networkx as nx
@@ -19,9 +20,10 @@ class GraphMiner:
         self.graph = nx.DiGraph()
         self.shared_vault_path = Path("shared_vaults")
         self.shared_vault_path.mkdir(parents=True, exist_ok=True)
-        logger.info("🔍 GraphMiner v0.9.12 MAX SOTA initialized — full cross-vault synergy and provenance tracking")
+        logger.info("🔍 GraphMiner v0.9.13 MAX SOTA initialized — full vector-first 5-objective synergy and provenance tracking")
 
     def load_vaults(self) -> Dict:
+        """Load all fragments from shared vaults."""
         vaults = {}
         for vault_dir in self.shared_vault_path.iterdir():
             if vault_dir.is_dir():
@@ -36,40 +38,83 @@ class GraphMiner:
         return vaults
 
     def mine(self, vaults: Dict = None) -> List[Dict]:
+        """Full SOTA vector-first graph mining pipeline."""
         if vaults is None:
             vaults = self.load_vaults()
 
         self._build_graph(vaults)
         patterns = self._discover_patterns()
-        synergy_scores = self._compute_synergy_scores()
-        ranked_insights = self._rank_insights(patterns, synergy_scores)
+        ranked_insights = self._rank_insights_vector_first(patterns)
 
-        logger.info(f"Graph mining complete — {len(ranked_insights)} high-value insights discovered")
+        logger.info(f"Graph mining complete — {len(ranked_insights)} high-value insights discovered (vector-first)")
         return ranked_insights
 
     def _build_graph(self, vaults: Dict):
+        """Vector-first graph construction with objective vectors."""
         self.graph.clear()
         for vault_name, fragments in vaults.items():
             for frag in fragments:
                 frag_id = frag.get("fragment_id") or f"frag_{hash(str(frag))}"
-                self.graph.add_node(frag_id, **frag, vault=vault_name, timestamp=frag.get("timestamp"))
+                objective_vector = frag.get("objective_vector") or self._convert_legacy_to_vector(frag)
 
-                for other_id in list(self.graph.nodes):
-                    if other_id != frag_id:
-                        similarity = self._compute_fragment_similarity(frag, self.graph.nodes[other_id])
-                        if similarity > 0.65:
-                            self.graph.add_edge(frag_id, other_id, weight=similarity)
+                self.graph.add_node(
+                    frag_id,
+                    content=frag.get("content_preview", ""),
+                    objective_vector=objective_vector,
+                    timestamp=frag.get("timestamp"),
+                    provenance=frag.get("provenance", {}),
+                    vault=vault_name,
+                    combined_score=frag.get("combined_score", 0.0)  # backward compat
+                )
 
-    def _compute_fragment_similarity(self, frag1: Dict, frag2: Dict) -> float:
-        text1 = str(frag1.get("content", "")) + " " + str(frag1.get("key_takeaway", ""))
-        text2 = str(frag2.get("content", "")) + " " + str(frag2.get("key_takeaway", ""))
-        words1 = set(text1.lower().split())
-        words2 = set(text2.lower().split())
-        jaccard = len(words1 & words2) / max(1, len(words1 | words2))
-        tag_bonus = 0.3 if frag1.get("vault") == frag2.get("vault") else 0.0
-        return min(1.0, jaccard * 0.7 + tag_bonus)
+                # Add vector-based edges
+                self._add_vector_based_edges(frag_id, objective_vector, frag)
+
+    def _convert_legacy_to_vector(self, frag: Dict) -> Dict:
+        """Safely convert older scalar fragments to 5-objective vector."""
+        score = frag.get("combined_score", 0.65)
+        return {
+            "implementation_quality": score,
+            "prediction_accuracy": score,
+            "value_creation": score,
+            "learning_to_learn": score,
+            "robustness": score
+        }
+
+    def _add_vector_based_edges(self, node_id: str, vec: Dict, frag: Dict):
+        """Add edges using cosine similarity on the 5-objective vector."""
+        for existing_id, data in list(self.graph.nodes(data=True)):
+            if existing_id == node_id:
+                continue
+            other_vec = data.get("objective_vector", {})
+            if not other_vec:
+                continue
+
+            sim = self._cosine_similarity(vec, other_vec)
+            if sim > 0.65:  # tunable threshold
+                self.graph.add_edge(
+                    node_id,
+                    existing_id,
+                    weight=sim,
+                    shared_objectives=self._shared_objectives(vec, other_vec)
+                )
+
+    def _cosine_similarity(self, v1: Dict, v2: Dict) -> float:
+        """Cosine similarity across the 5-objective vector."""
+        keys = ["implementation_quality", "prediction_accuracy", "value_creation", "learning_to_learn", "robustness"]
+        a = np.array([v1.get(k, 0.5) for k in keys])
+        b = np.array([v2.get(k, 0.5) for k in keys])
+        if np.all(a == 0) or np.all(b == 0):
+            return 0.0
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+
+    def _shared_objectives(self, v1: Dict, v2: Dict) -> List[str]:
+        """Return objectives where both vectors are strong (>0.75)."""
+        keys = ["implementation_quality", "prediction_accuracy", "value_creation", "learning_to_learn", "robustness"]
+        return [k for k in keys if v1.get(k, 0) > 0.75 and v2.get(k, 0) > 0.75]
 
     def _discover_patterns(self) -> List[Dict]:
+        """Discover central patterns from the graph."""
         if len(self.graph) < 3:
             return []
         centrality = nx.degree_centrality(self.graph)
@@ -82,25 +127,54 @@ class GraphMiner:
                 "strength": round(score, 3),
                 "content_preview": str(data.get("content", ""))[:200],
                 "vault": data.get("vault"),
-                "timestamp": data.get("timestamp")
+                "timestamp": data.get("timestamp"),
+                "objective_vector": data.get("objective_vector", {})
             })
         return patterns
 
-    def _compute_synergy_scores(self) -> Dict:
-        synergy = {}
-        for vault in self.shared_vault_path.iterdir():
-            if vault.is_dir():
-                synergy[vault.name] = round(np.random.uniform(0.65, 0.95), 3)  # Replace with real cross-vault analysis in production
-        return synergy
-
-    def _rank_insights(self, patterns: List[Dict], synergy: Dict) -> List[Dict]:
-        ranked = []
+    def _rank_insights_vector_first(self, patterns: List[Dict]) -> List[Dict]:
+        """Primary ranking now uses full objective vector strength + synergy bonus."""
         for p in patterns:
-            p["synergy_score"] = synergy.get(p["vault"], 0.7)
-            p["combined_score"] = (p["strength"] * 0.6) + (p["synergy_score"] * 0.4)
-            ranked.append(p)
-        ranked.sort(key=lambda x: x["combined_score"], reverse=True)
-        return ranked[:50]
+            vec = p.get("objective_vector", {})
+            p["vector_strength"] = self._compute_vector_strength(vec)
+            p["synergy_bonus"] = 0.0  # can be enriched later with edge data
+            p["final_rank_score"] = p["vector_strength"] * (1 + p["synergy_bonus"])
+        patterns.sort(key=lambda x: x["final_rank_score"], reverse=True)
+        return patterns[:50]  # top 50 highest-signal insights
+
+    def _compute_vector_strength(self, vec: Dict) -> float:
+        """Geometric mean across the 5 objectives (prevents any single weak objective from being ignored)."""
+        keys = ["implementation_quality", "prediction_accuracy", "value_creation", "learning_to_learn", "robustness"]
+        values = [vec.get(k, 0.0) for k in keys]
+        if not values or max(values) == 0:
+            return 0.0
+        return np.prod([v + 1e-8 for v in values]) ** (1 / len(values))
+
+    def _get_strongest_objectives(self) -> Dict[str, float]:
+        """Return current strongest/weakest objectives across the entire graph (for Meta-RL)."""
+        if not self.graph.nodes:
+            return {}
+        all_vectors = [data.get("objective_vector", {}) for _, data in self.graph.nodes(data=True) if data.get("objective_vector")]
+        if not all_vectors:
+            return {}
+        avg = {k: np.mean([v.get(k, 0.5) for v in all_vectors]) for k in ["implementation_quality", "prediction_accuracy", "value_creation", "learning_to_learn", "robustness"]}
+        return dict(sorted(avg.items(), key=lambda x: x[1], reverse=True))
+
+    def get_graph_stats(self) -> Dict:
+        """Full stats including vector distribution for Meta-RL and monitoring."""
+        return {
+            "total_nodes": len(self.graph.nodes),
+            "total_edges": len(self.graph.edges),
+            "average_vector_strength": self._compute_average_vector_strength(),
+            "strongest_objectives": self._get_strongest_objectives()
+        }
+
+    def _compute_average_vector_strength(self) -> float:
+        if not self.graph.nodes:
+            return 0.0
+        strengths = [self._compute_vector_strength(data.get("objective_vector", {})) 
+                     for _, data in self.graph.nodes(data=True)]
+        return np.mean(strengths)
 
 # Global instance
 graph_miner = GraphMiner()

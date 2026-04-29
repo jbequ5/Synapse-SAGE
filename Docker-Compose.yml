@@ -1,0 +1,21 @@
+version: '3.9'
+
+services:
+  synapse:
+    build: .
+    container_name: synapse-intelligence
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-your-secret-api-key-here}
+      - LOG_LEVEL=info
+    volumes:
+      - ./synapse/data:/app/synapse/data          # persists vaults, calibration, models, training data
+      - ./shared_vaults:/app/shared_vaults        # mount the shared vaults from SAGE (read/write)
+    networks:
+      - sage-network
+
+networks:
+  sage-network:
+    driver: bridge

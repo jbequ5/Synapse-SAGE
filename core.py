@@ -2,6 +2,7 @@
 Synapse Meta-Agent Core — v0.9.13 MAXIMUM SOTA
 Central orchestrator for the entire Synapse intelligence layer.
 Fully vector-first 5-objective design. Coordinates Graph Mining → NeuralNetHead → Meta-RL → KAS → Defense → Economic Layer → Distillation.
+Enforces private-gatekeeper handoff and internal ranked vaults only.
 """
 
 import time
@@ -40,24 +41,41 @@ class SynapseMetaAgent:
         self.economic = economic_layer
         
         self.last_loop = datetime.now()
-        logger.info("🚀 SynapseMetaAgent v0.9.13 MAX SOTA initialized — full vector-first integration complete")
+        logger.info("🚀 SynapseMetaAgent v0.9.13 MAX SOTA initialized — full vector-first integration + private-gatekeeper model complete")
 
     def run_daily_intelligence_cycle(self):
+        """Full nightly intelligence cycle — the heart of the self-improving flywheel."""
         logger.info("🔄 Starting Synapse daily intelligence cycle")
         
         try:
-            vaults = load_shared_vaults(self.config.shared_vault_path)
+            # Load only internal ranked vaults (gate already happened)
+            vaults = load_shared_vaults(self.config.shared_vault_path, vault_type="internal")
             
+            # 1. Graph Mining on ranked internal vaults
             mined_patterns = self.graph_miner.mine(vaults)
+            
+            # 2. Meta-RL audit & improvement (targets weakest objectives)
             rl_results = self.meta_rl.run_audit_and_improve(mined_patterns)
-            scored_insights = self.neural_head.score_and_calibrate(rl_results) if hasattr(self.neural_head, "score_and_calibrate") else rl_results
-            hardened_insights = self.defense.red_team_and_harden(scored_insights)
+            
+            # 3. NeuralNetHead vector scoring & calibration
+            scored_insights = self.neural_head.score_and_calibrate(rl_results)
+            
+            # 4. Defense Red Team hardening
+            hardened_insights = self.defense.run_ahe_cycle(scored_insights)
+            
+            # 5. KAS recursive knowledge acquisition
             kas_results = self.kas.recursive_hunt(hardened_insights)
+            
+            # 6. Economic polishing & synthesis
             polished_products = self.economic.polish_and_synthesize(kas_results)
             
+            # 7. Lightweight nightly tasks + training data preparation
             self._run_lightweight_nightly_tasks(vaults, polished_products)
-            save_to_vaults(polished_products, self.config.shared_vault_path)
             
+            # 8. Save polished artifacts
+            save_to_vaults(polished_products, self.config.shared_vault_path, vault_name="internal")
+            
+            # 9. Check readiness for model distillation
             distillation_ready = self.distiller.check_readiness(polished_products)
             
             self.last_loop = datetime.now()
@@ -75,6 +93,7 @@ class SynapseMetaAgent:
             return {"status": "error", "error": str(e)}
 
     def _run_lightweight_nightly_tasks(self, vaults: Dict, polished_products: List[Dict]):
+        """Pruning, training data cleaning, market summary, health reporting."""
         prune_old_vaults(self.config.shared_vault_path, max_age_days=14)
         self._clean_and_prepare_training_data(vaults, polished_products)
         
@@ -90,13 +109,14 @@ class SynapseMetaAgent:
         save_to_vaults([health_report], self.config.shared_vault_path, vault_name="nightly_reports")
 
     def _clean_and_prepare_training_data(self, vaults: Dict, polished_products: List[Dict]):
+        """Prepares high-quality data for model distillation using all 5 objectives."""
         training_dir = Path(self.config.training_data_vault_path)
         training_dir.mkdir(parents=True, exist_ok=True)
 
         clean_data = []
         for vault_name, fragments in vaults.items():
             for frag in fragments:
-                score = frag.get("combined_score", 0.0)
+                score = frag.get("hybrid_rank_score", frag.get("combined_score", 0.0))
                 risk = frag.get("red_team_risk", 1.0)
                 freshness = self.kas.assess_freshness(frag)
                 if (score >= self.config.training_data_min_score and
@@ -120,9 +140,11 @@ class SynapseMetaAgent:
             logger.info(f"📦 Training data vault cleaned — {len(clean_data)} high-quality samples prepared")
 
     def get_synapse_chat_response(self, user_query: str, user_tier: str = "standard") -> Dict[str, Any]:
+        """Public entry point for Synapse Chat / Co-Pilot."""
         return self.chat.handle_query(user_query, user_tier)
 
     def start_background_loop(self):
+        """Starts the daily intelligence cycle in background thread."""
         def loop():
             while True:
                 self.run_daily_intelligence_cycle()

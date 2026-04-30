@@ -78,7 +78,7 @@ class SynapseMetaAgent:
             # 8. Save polished artifacts to internal vaults
             save_to_vaults(polished_products, self.config.shared_vault_path, vault_name="internal")
             
-            # 9. Check readiness for model distillation
+            # 9. Check readiness for model distillation (continuously learning teacher)
             distillation_ready = self.distiller.check_readiness(polished_products)
             
             self.last_loop = datetime.now()

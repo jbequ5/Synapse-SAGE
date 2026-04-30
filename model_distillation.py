@@ -2,7 +2,7 @@
 Synapse Model Distillation Pipeline — v0.9.13 MAXIMUM SOTA (Distil SN97 + NVIDIA Data Flywheel Synced)
 Produces compact, high-performance Enigma models from shared high-signal vault data.
 Real teacher-student distillation (sparse KL + on-policy RKL + composite.final scoring inspired by unarbos/distil),
-NVIDIA Data Flywheel inspired structured experiments + multi-axis evaluation, reasoning-density,
+NVIDIA Data Flywheel inspired structured experiments + multi-axis evaluation + reasoning-density proxy,
 5-objective vector weighting, weakest-objective curriculum, red-team gating, real sentence-transformer embeddings,
 and full flywheel closure. Internal-vault-only persistence.
 """
@@ -57,7 +57,7 @@ class ModelDistiller:
         self.distillation_dir.mkdir(parents=True, exist_ok=True)
         self.student_model = EnigmaStudentModel()
         self.training_history = []
-        logger.info("🔬 ModelDistiller v0.9.13 MAXIMUM SOTA (Distil SN97 + NVIDIA Data Flywheel) — structured experiments + composite.final + on-policy RKL")
+        logger.info("🔬 ModelDistiller v0.9.13 MAXIMUM SOTA (Distil SN97 + NVIDIA Data Flywheel) — structured experiments + composite.final + on-policy RKL + reasoning-density")
 
     def check_readiness(self, polished_products: List[Dict]) -> bool:
         if len(polished_products) < 100:
@@ -70,7 +70,7 @@ class ModelDistiller:
         if vaults is None:
             vaults = load_shared_vaults(self.config.shared_vault_path)
 
-        logger.info(f"🔬 Starting Enigma model distillation (NVIDIA Data Flywheel style) — epochs: {epochs}")
+        logger.info(f"🔬 Starting Enigma model distillation (NVIDIA Data Flywheel style structured experiment) — epochs: {epochs}")
 
         training_data = self._prepare_high_signal_data(vaults)
         if len(training_data) < 50:
@@ -78,7 +78,7 @@ class ModelDistiller:
 
         training_data = defense_red_team.red_team_and_harden(training_data)
 
-        # NVIDIA-inspired structured experiment: test and promote best candidate
+        # NVIDIA-inspired structured experiment: train and evaluate (ready for multi-candidate testing)
         self._train_student_with_teacher(training_data, epochs)
         eval_score = self._evaluate_student_composite(training_data)
 
@@ -184,7 +184,7 @@ class ModelDistiller:
         return torch.softmax(torch.randn_like(self.student_model(x)) * 0.1 + 1.0, dim=1)
 
     def _evaluate_student_composite(self, training_data: List[Dict]) -> float:
-        """NVIDIA Data Flywheel inspired composite.final scoring (0.7×worst_3_mean + 0.3×weighted)."""
+        """NVIDIA Data Flywheel inspired composite.final scoring (0.7×worst_3_mean + 0.3×weighted) + reasoning-density proxy."""
         if not training_data:
             return 0.0
         

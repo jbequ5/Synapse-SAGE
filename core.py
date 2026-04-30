@@ -3,12 +3,14 @@ Synapse Meta-Agent Core — v0.9.13 MAXIMUM SOTA
 Central orchestrator for the entire Synapse intelligence layer.
 Fully vector-first 5-objective design. Coordinates Graph Mining → NeuralNetHead → Meta-RL → KAS → Defense → Economic Layer → Distillation.
 Enforces private-gatekeeper handoff and internal ranked vaults only.
+Distil SN97 sync checker included.
 """
 
 import time
 import logging
 import threading
 import json
+import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
@@ -41,14 +43,14 @@ class SynapseMetaAgent:
         self.economic = economic_layer
         
         self.last_loop = datetime.now()
-        logger.info("🚀 SynapseMetaAgent v0.9.13 MAX SOTA initialized — full vector-first integration + private-gatekeeper model complete")
+        logger.info("🚀 SynapseMetaAgent v0.9.13 MAXIMUM SOTA initialized — full vector-first integration + private-gatekeeper model + Distil SN97 sync")
 
     def run_daily_intelligence_cycle(self):
         """Full nightly intelligence cycle — the heart of the self-improving flywheel."""
         logger.info("🔄 Starting Synapse daily intelligence cycle")
         
         try:
-            # Load only internal ranked vaults (gate already happened)
+            # Load ONLY internal ranked vaults (gate already happened)
             vaults = load_shared_vaults(self.config.shared_vault_path, vault_type="internal")
             
             # 1. Graph Mining on ranked internal vaults
@@ -58,7 +60,8 @@ class SynapseMetaAgent:
             rl_results = self.meta_rl.run_audit_and_improve(mined_patterns)
             
             # 3. NeuralNetHead vector scoring & calibration
-            scored_insights = self.neural_head.score_and_calibrate(rl_results)
+            scored_insights = self.neural_head.score_advice(rl_results)
+            calibration_result = self.neural_head.calibrate_from_history()
             
             # 4. Defense Red Team hardening
             hardened_insights = self.defense.run_ahe_cycle(scored_insights)
@@ -69,10 +72,10 @@ class SynapseMetaAgent:
             # 6. Economic polishing & synthesis
             polished_products = self.economic.polish_and_synthesize(kas_results)
             
-            # 7. Lightweight nightly tasks + training data preparation
+            # 7. Lightweight nightly tasks + training data preparation + Distil SN97 sync
             self._run_lightweight_nightly_tasks(vaults, polished_products)
             
-            # 8. Save polished artifacts
+            # 8. Save polished artifacts to internal vaults
             save_to_vaults(polished_products, self.config.shared_vault_path, vault_name="internal")
             
             # 9. Check readiness for model distillation
@@ -93,12 +96,15 @@ class SynapseMetaAgent:
             return {"status": "error", "error": str(e)}
 
     def _run_lightweight_nightly_tasks(self, vaults: Dict, polished_products: List[Dict]):
-        """Pruning, training data cleaning, market summary, health reporting."""
+        """Pruning, training data cleaning, market summary, health reporting + Distil SN97 sync."""
         prune_old_vaults(self.config.shared_vault_path, max_age_days=14)
         self._clean_and_prepare_training_data(vaults, polished_products)
         
         summary = self.economic.get_market_summary()
         logger.info(f"💰 Nightly market summary — Total value created: {summary.get('total_value_created', 0):.2f}")
+
+        # Distil SN97 update checker (stays on par with leading Bittensor subnet)
+        self._check_distil_sn97_updates()
 
         health_report = {
             "timestamp": datetime.now().isoformat(),
@@ -107,6 +113,18 @@ class SynapseMetaAgent:
             "market_summary": summary
         }
         save_to_vaults([health_report], self.config.shared_vault_path, vault_name="nightly_reports")
+
+    def _check_distil_sn97_updates(self):
+        """Nightly check for updates to unarbos/distil (Distil SN97) — logs latest techniques."""
+        try:
+            r = requests.get("https://api.github.com/repos/unarbos/distil/commits/main", timeout=10)
+            if r.status_code == 200:
+                latest = r.json()[0]
+                commit_date = latest["commit"]["author"]["date"]
+                message = latest["commit"]["message"][:150]
+                logger.info(f"📡 Distil SN97 latest commit: {commit_date} — {message}")
+        except Exception as e:
+            logger.debug(f"Distil SN97 update check failed: {e}")
 
     def _clean_and_prepare_training_data(self, vaults: Dict, polished_products: List[Dict]):
         """Prepares high-quality data for model distillation using all 5 objectives."""
@@ -150,7 +168,7 @@ class SynapseMetaAgent:
                 self.run_daily_intelligence_cycle()
                 time.sleep(self.config.daily_loop_interval_seconds)
         threading.Thread(target=loop, daemon=True).start()
-        logger.info("🌍 Synapse background intelligence loop started (daily cycle + lightweight nightly tasks)")
+        logger.info("🌍 Synapse background intelligence loop started (daily cycle + lightweight nightly tasks + Distil SN97 sync)")
 
 # Global instance
 synapse = SynapseMetaAgent()

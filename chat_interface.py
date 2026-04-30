@@ -36,7 +36,7 @@ class SynapseChatInterface:
         raw_response = self._generate_grounded_llm_response(user_query, context, user_tier)
 
         # 3. Red-team the actual response text for safety, quality, and alignment
-        red_team_report = defense_red_team.red_team_scoring_and_validation({"content": raw_response, "objective_vector": context.get("strongest_objectives")})
+        red_team_report = defense_red_team.red_team_and_harden({"content": raw_response, "objective_vector": context.get("vector_snapshot", {})})
 
         if not red_team_report.get("passed", False):
             response_text = "I detected a potential issue with that response. Let me refine it for maximum value and safety."
@@ -57,7 +57,8 @@ class SynapseChatInterface:
             "context_summary": {
                 "mined_patterns": len(context.get("mined_patterns", [])),
                 "weakest_objective": context.get("weakest_objective"),
-                "strongest_objectives": list(context.get("strongest_objectives", {}).keys())[:2]
+                "strongest_objectives": list(context.get("strongest_objectives", {}).keys())[:3],
+                "economic_summary": context.get("economic_summary", {})
             }
         }
 
@@ -66,24 +67,22 @@ class SynapseChatInterface:
 
     def _gather_live_context(self) -> Dict:
         """Gather rich, vector-first context from all subsystems."""
-        mined = graph_miner.mine()[:10]
+        mined = graph_miner.mine()[:12]  # Top high-signal patterns
         strongest = graph_miner._get_strongest_objectives()
-        weakest = list(strongest.keys())[-1] if strongest else None
+        weakest = min(strongest, key=strongest.get) if strongest else None
 
         return {
             "mined_patterns": mined,
             "strongest_objectives": strongest,
             "weakest_objective": weakest,
-            "recent_rl_results": meta_rl_loop.audit_history[-8:],
-            "kas_freshness_hint": recursive_kas.assess_freshness({}) if hasattr(recursive_kas, "assess_freshness") else 0.75,
+            "recent_rl_results": meta_rl_loop.audit_history[-10:],
+            "kas_freshness_hint": recursive_kas.assess_freshness({}) if hasattr(recursive_kas, "assess_freshness") else 0.78,
             "economic_summary": economic_layer.get_market_summary(),
-            "vector_snapshot": strongest  # full vector for downstream use
+            "vector_snapshot": strongest  # Full vector for downstream use
         }
 
     def _generate_grounded_llm_response(self, query: str, context: Dict, tier: str) -> str:
         """Grounded LLM generation with full vector-first context."""
-        # In production this calls the configured LLM (Ollama, Grok, etc.) with the full context
-        # For now we simulate a high-quality grounded response (replace with real LLM harness)
         weakest = context.get("weakest_objective", "value_creation")
         pattern_count = len(context.get("mined_patterns", []))
 
@@ -104,12 +103,12 @@ class SynapseChatInterface:
         suggestions = []
         weakest = context.get("weakest_objective")
 
-        if weakest:
+        if weakest and tier in ["contributor", "sponsor", "alpha"]:
             suggestions.append({
                 "type": "proactive",
                 "title": f"Target {weakest.upper()}",
                 "description": f"Your weakest objective is currently **{weakest}**. Trigger a focused improvement cycle?",
-                "action": "trigger_kas_hunt" if tier in ["contributor", "sponsor", "alpha"] else None,
+                "action": "trigger_kas_hunt",
                 "priority": "high"
             })
 

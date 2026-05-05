@@ -1,3 +1,4 @@
+# operations/meta_rl.py
 """
 Synapse Meta-RL Loop — v0.9.13 MAXIMUM SOTA
 Fully vector-first: consumes the complete 5-objective vector from NeuralNetHead.
@@ -14,20 +15,19 @@ from datetime import datetime
 from typing import Dict, Any, List
 import numpy as np
 
-from synapse.config import SynapseConfig
-from synapse.utils import load_shared_vaults, save_to_vaults
-from synapse.neural_net_head import neural_net_head
-from synapse.defense_red_team import defense_red_team
-from synapse.graph_mining import graph_miner
-from synapse.kas import recursive_kas
-from synapse.economic_layer import economic_layer
+from .config import OperationsConfig
+from .defense_red_team import defense_red_team
+# Assume the other imports are available in the full Synapse package
+# from synapse.neural_net_head import neural_net_head
+# from synapse.graph_mining import graph_miner
+# etc.
 
 logger = logging.getLogger(__name__)
 
 class MetaRLLoop:
-    def __init__(self, config: SynapseConfig = None):
-        self.config = config or SynapseConfig()
-        self.audit_history_path = Path("synapse/data/internal_vaults/meta_rl_audit_history.json")
+    def __init__(self, config: OperationsConfig = None):
+        self.config = config or OperationsConfig()
+        self.audit_history_path = Path("data/internal_vaults/meta_rl_audit_history.json")
         self.audit_history = self._load_audit_history()
         logger.info("🔄 MetaRLLoop v0.9.13 MAXIMUM SOTA initialized — full 5-objective vector-driven self-improvement brain")
 
@@ -48,30 +48,28 @@ class MetaRLLoop:
         logger.info("🔄 Running Meta-RL self-audit & improvement cycle")
 
         if mined_patterns is None:
-            mined_patterns = graph_miner.mine()[:20]
+            # mined_patterns = graph_miner.mine()[:20]  # placeholder
+            mined_patterns = []
 
         # 1. Gather live vector-first context
-        strongest = graph_miner._get_strongest_objectives()
-        neural_score = neural_net_head.score_advice(
-            {"mined_patterns": len(mined_patterns), "strongest_objectives": strongest},
-            self._perform_audit()
-        )
+        strongest = {}  # graph_miner._get_strongest_objectives() placeholder
+        neural_score = {"combined_score": 0.75, "objective_vector": {}}  # placeholder for neural_net_head.score_advice
 
         # 2. DefenseRedTeam integration for risk-aware scoring
-        red_team_report = defense_red_team.red_team_scoring_and_validation({"mined_patterns": mined_patterns})
-        red_team_risk = red_team_report.get("overall_risk", 0.0)
+        red_team_report = defense_red_team.run_ahe_cycle()
+        red_team_risk = red_team_report.get("avg_hardening_effectiveness", 0.0)  # use effectiveness as risk proxy
 
-        # 3. Compute full Defense Health Score and Flywheel Velocity (exact from Defense Metrics doc)
+        # 3. Compute full Defense Health Score and Flywheel Velocity
         defense_health = self._compute_defense_health_score(neural_score, red_team_risk)
         flywheel_velocity = self._compute_flywheel_velocity()
 
-        final_success_score = neural_score["combined_score"] * (1.0 - red_team_risk * 0.35)
+        final_success_score = neural_score.get("combined_score", 0.75) * (1.0 - red_team_risk * 0.35)
 
         # 4. Generate targeted proposals focused on weakest objectives
         proposals = self._generate_vector_targeted_proposals(neural_score, strongest)
 
         # 5. Conservative calibration + genome mutation
-        calibration_result = neural_net_head.calibrate_from_history()
+        calibration_result = {"status": "calibrated", "calibration_delta": 0.0}  # placeholder
         self._apply_conservative_genome_mutation(calibration_result)
 
         # 6. Record rich audit entry
@@ -85,7 +83,7 @@ class MetaRLLoop:
             "flywheel_velocity": flywheel_velocity,
             "proposals_count": len(proposals),
             "calibration_delta": calibration_result.get("calibration_delta", 0.0),
-            "weakest_objective": min(neural_score.get("objective_vector", {}), key=lambda k: neural_score.get("objective_vector", {}).get(k, 1.0))
+            "weakest_objective": min(neural_score.get("objective_vector", {}), key=lambda k: neural_score.get("objective_vector", {}).get(k, 1.0)) if neural_score.get("objective_vector") else "none"
         }
         self.audit_history.append(audit_entry)
         if len(self.audit_history) > 2000:
@@ -94,10 +92,7 @@ class MetaRLLoop:
 
         # 7. Close the flywheel: refined strategies + feedback to all subsystems
         refined_strategies = self._prepare_refined_strategies(proposals)
-        save_to_vaults(refined_strategies, self.config.shared_vault_path, vault_name="internal/strategy")
-
-        recursive_kas.recursive_hunt(refined_strategies[:8])      # KAS compounding
-        economic_layer.polish_and_synthesize(refined_strategies[:6])  # Economic compounding
+        # save_to_vaults(refined_strategies, self.config.shared_vault_path, vault_name="internal/strategy")  # placeholder
 
         logger.info(f"✅ Meta-RL cycle complete — Success Score: {final_success_score:.3f} | Defense Health: {defense_health:.3f} | Flywheel Velocity: {flywheel_velocity:.2f} | Weakest objective targeted: {audit_entry['weakest_objective']}")
         return {
@@ -113,7 +108,6 @@ class MetaRLLoop:
         }
 
     def _perform_audit(self) -> Dict:
-        """Rich audit using full history."""
         recent = self.audit_history[-80:] if len(self.audit_history) > 80 else self.audit_history
         return {
             "recent_advice_count": len(recent),
@@ -123,16 +117,14 @@ class MetaRLLoop:
         }
 
     def _compute_defense_health_score(self, neural_score: Dict, red_team_risk: float) -> float:
-        """Overall Defense Health Score (exact from Defense Metrics doc)."""
         return (
             0.40 * (1 - red_team_risk) +
             0.25 * neural_score.get("combined_score", 0.75) +
-            0.20 * (len(self.audit_history) / 100.0) +  # Telemetry quality proxy
+            0.20 * (len(self.audit_history) / 100.0) +
             0.15 * self._compute_flywheel_velocity()
         )
 
     def _compute_flywheel_velocity(self) -> float:
-        """Flywheel Velocity Score (exact from Integration & Flywheel doc)."""
         if len(self.audit_history) < 10:
             return 1.0
         recent = self.audit_history[-20:]
@@ -141,18 +133,10 @@ class MetaRLLoop:
         return hardened_per_cycle * avg_cross_benefit
 
     def _generate_vector_targeted_proposals(self, neural_score: Dict, strongest: Dict) -> List[Dict]:
-        """Dynamic, vector-first proposals targeting weakest objectives."""
         proposals = []
-        objective_scores = neural_score.get("objective_vector", {}) or {
-            "implementation_quality": neural_score.get("implementation_quality", 0.75),
-            "prediction_accuracy": neural_score.get("prediction_accuracy", 0.75),
-            "value_creation": neural_score.get("value_creation", 0.75),
-            "learning_to_learn": neural_score.get("learning_to_learn", 0.75),
-            "robustness": neural_score.get("robustness", 0.75)
-        }
-
+        objective_scores = neural_score.get("objective_vector", {}) or {}
         for obj, score in sorted(objective_scores.items(), key=lambda x: x[1]):
-            if score < 0.78:  # Weakest-objective threshold
+            if score < 0.78:
                 proposals.append({
                     "target": obj,
                     "change": f"Boost {obj} (current: {score:.3f}) — system weakest objective",
@@ -160,21 +144,13 @@ class MetaRLLoop:
                     "priority": "high",
                     "system_strongest": list(strongest.keys())[:3]
                 })
-                break  # Focus on the single weakest for conservative improvement
+                break
         return proposals
 
     def _apply_conservative_genome_mutation(self, calibration_result: Dict):
-        """Conservative genome mutation (max 8% change per cycle — exact from Meta-Tuning doc)."""
-        if calibration_result.get("status") != "calibrated":
-            return
-        delta = calibration_result.get("calibration_delta", 0.0)
-        if abs(delta) > 0.08:  # Global re-scoring tolerance alignment
-            for k in neural_net_head.weights:
-                mutation = np.random.uniform(-0.08, 0.08)
-                neural_net_head.weights[k] = max(0.05, min(0.40, neural_net_head.weights[k] + mutation))
+        pass  # placeholder for now
 
     def _prepare_refined_strategies(self, proposals: List[Dict]) -> List[Dict]:
-        """Refined strategies for Strategy Layer vaults."""
         strategies = []
         for p in proposals:
             strategies.append({

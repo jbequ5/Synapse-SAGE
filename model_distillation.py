@@ -181,6 +181,14 @@ class ModelDistiller:
         scores = [s.get("target_efs", 0.0) for s in data]
         return round(0.78 + np.mean(scores) * 0.22, 4)
 
-
+# model_distillation.py (add this method at the end of the ModelDistiller class)
+    def check_readiness(self, polished_products: List[Dict]) -> bool:
+        """Check if we have enough high-quality data for the next MOPE distillation run."""
+        if len(polished_products) < 50:
+            return False
+        # Simple but robust readiness signal (can be expanded)
+        avg_score = np.mean([p.get("combined_score", 0.0) for p in polished_products if "combined_score" in p])
+        return avg_score > 0.75
+        
 # Global instance
 model_distiller = ModelDistiller()

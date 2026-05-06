@@ -1,8 +1,9 @@
+# kas.py (or recursive_kas.py — place in the repo root / synapse/ folder)
 """
 Synapse Recursive Knowledge Acquisition Subsystem (KAS) — v0.9.13 MAXIMUM SOTA
 Fully vector-first 5-objective engine. Real ToolHunter live search, aggressive red-team gating,
 GraphMiner synergy, targeted recursion on weakest objectives, and full feedback to Meta-RL + Economic Layer.
-No stubs. Production-grade, live-context driven, private-gatekeeper compliant.
+Production-grade, live-context driven, private-gatekeeper compliant.
 """
 
 import logging
@@ -18,13 +19,13 @@ import requests
 from huggingface_hub import HfApi
 from sklearn.ensemble import RandomForestRegressor
 
-from synapse.config import SynapseConfig
-from synapse.graph_mining import graph_miner
-from synapse.meta_rl_loop import meta_rl_loop
-from synapse.neural_net_head import neural_net_head
-from synapse.defense_red_team import defense_red_team
-from synapse.economic_layer import economic_layer
-from synapse.utils import load_shared_vaults, save_to_vaults
+from config import SynapseConfig
+from graph_mining import graph_miner
+from meta_rl_loop import meta_rl_loop
+from neural_net_head import neural_net_head
+from defense_red_team import defense_red_team
+from economic_layer import economic_layer
+from utils import load_shared_vaults, save_to_vaults
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class RecursiveKAS:
 
     def __init__(self, config: SynapseConfig = None):
         self.config = config or SynapseConfig()
-        self.knowledge_dir = Path("synapse/data/internal_vaults/kas_acquired")
+        self.knowledge_dir = Path("data/internal_vaults/kas_acquired")
         self.knowledge_dir.mkdir(parents=True, exist_ok=True)
         self.recursion_depth = 0
         self.max_recursion = 6
@@ -58,9 +59,9 @@ class RecursiveKAS:
 
             next_layer = []
             for insight in current_layer:
-                # Aggressive red-team gating (Defense integration)
-                red_team_report = defense_red_team.red_team_scoring_and_validation(insight)
-                if not red_team_report.get("passed", False):
+                # Aggressive red-team gating using the real method
+                hardened_seed = defense_red_team.red_team_and_harden([insight])
+                if not hardened_seed or not hardened_seed[0].get("passed_red_team", False):
                     continue
 
                 # Acquire new high-signal knowledge using real ToolHunter
@@ -72,7 +73,11 @@ class RecursiveKAS:
                     frag["objective_vector"] = scored.get("objective_vector", {})
                     frag["combined_score"] = scored.get("combined_score", 0.65)
                     frag["neural_scores"] = scored
-                    frag["provenance"] = {"source": "kas_hunt", "seed_id": insight.get("node_id"), "depth": self.recursion_depth}
+                    frag["provenance"] = {
+                        "source": "kas_hunt",
+                        "seed_id": insight.get("node_id") or insight.get("pattern_id"),
+                        "depth": self.recursion_depth
+                    }
                     self._update_predictive_power(frag)
 
                 # Final hardening pass
@@ -90,8 +95,8 @@ class RecursiveKAS:
         # Persist ONLY to internal ranked vaults (private-gatekeeper rule)
         save_to_vaults(all_new_fragments, self.config.shared_vault_path, vault_name="internal/kas_acquired")
 
-        # Close the flywheel: Meta-RL + Economic feedback
-        meta_rl_loop.run_audit_and_improve(all_new_fragments)
+        # Close the flywheel: Meta-RL + Economic feedback (no-arg call)
+        meta_rl_loop.run_audit_and_improve()
         economic_layer.polish_and_synthesize(all_new_fragments)
 
         logger.info(f"✅ KAS recursive hunt complete — {len(all_new_fragments)} new high-signal fragments | Predictive power: {self.predictive_power:.3f}")
@@ -202,7 +207,7 @@ class RecursiveKAS:
         """KAS-powered stall resolution using live vector context."""
         weakest = graph_miner._get_strongest_objectives()
         weakest_obj = min(weakest, key=weakest.get) if weakest else "value_creation"
-        return f"Trigger deeper recursive KAS hunt on **{weakest_obj}** + run full red_team_scoring_and_validation"
+        return f"Trigger deeper recursive KAS hunt on **{weakest_obj}** + run full red_team_and_harden"
 
     def start_background_loop(self):
         """Continuous RL-style background acquisition (runs in parallel with nightly cycle)."""

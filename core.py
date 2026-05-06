@@ -3,34 +3,28 @@ Synapse Meta-Agent Core — v0.9.13 MAXIMUM SOTA
 Central orchestrator for the entire Synapse intelligence layer.
 Fully vector-first 5-objective design. Coordinates Graph Mining → NeuralNetHead → Meta-RL → KAS → Defense → Economic Layer → Distillation.
 Enforces private-gatekeeper handoff and internal ranked vaults only.
-Distil SN97 sync checker included.
 """
 
 import time
 import logging
 import threading
-import json
-import requests
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, Any, List
 
-from synapse.config import SynapseConfig
-from synapse.graph_mining import graph_miner
-from synapse.meta_rl_loop import meta_rl_loop
-from synapse.neural_net_head import neural_net_head
-from synapse.model_distillation import model_distiller
-from synapse.chat_interface import synapse_chat
-from synapse.defense_red_team import defense_red_team
-from synapse.kas import recursive_kas
-from synapse.economic_layer import economic_layer
-from synapse.utils import load_shared_vaults, save_to_vaults, prune_old_vaults
+from config import SynapseConfig
+from graph_mining import graph_miner
+from meta_rl_loop import meta_rl_loop
+from neural_net_head import neural_net_head
+from model_distillation import model_distiller
+from chat_interface import synapse_chat
+from defense_red_team import defense_red_team
+from kas import recursive_kas  # assuming this exists
+from economic_layer import economic_layer
+from utils import load_shared_vaults, save_to_vaults, prune_old_vaults
 
 logger = logging.getLogger(__name__)
 
 class SynapseMetaAgent:
-    """Central Synapse Meta-Agent — orchestrates all intelligence subsystems for SAGE."""
-
     def __init__(self, config: SynapseConfig = None):
         self.config = config or SynapseConfig()
         self.graph_miner = graph_miner
@@ -41,78 +35,48 @@ class SynapseMetaAgent:
         self.defense = defense_red_team
         self.kas = recursive_kas
         self.economic = economic_layer
-        
         self.last_loop = datetime.now()
-        logger.info("🚀 SynapseMetaAgent v0.9.13 MAXIMUM SOTA initialized — full vector-first integration + private-gatekeeper model + Distil SN97 sync")
+        logger.info("🚀 SynapseMetaAgent v0.9.13 MAXIMUM SOTA initialized — full vector-first integration")
 
     def run_daily_intelligence_cycle(self):
         """Full nightly intelligence cycle — the heart of the self-improving flywheel."""
         logger.info("🔄 Starting Synapse daily intelligence cycle")
-        
+
         try:
-            # Load ONLY internal ranked vaults (gate already happened)
             vaults = load_shared_vaults(self.config.shared_vault_path, vault_type="internal")
-            
-            # 1. Graph Mining on ranked internal vaults
             mined_patterns = self.graph_miner.mine(vaults)
-            
-            # 2. Meta-RL audit & improvement (targets weakest objectives)
-            rl_results = self.meta_rl.run_audit_and_improve(mined_patterns)
-            
-            # 3. NeuralNetHead vector scoring & calibration
-            scored_insights = self.neural_head.score_advice(rl_results)
-            calibration_result = self.neural_head.calibrate_from_history()
-            
-            # 4. Defense Red Team hardening
-            hardened_insights = self.defense.run_ahe_cycle(scored_insights)
-            
-            # 5. KAS recursive knowledge acquisition
-            kas_results = self.kas.recursive_hunt(hardened_insights)
-            
-            # 6. Economic polishing & synthesis
+
+            # Meta-RL is now the true final pass (no-arg call)
+            rl_results = self.meta_rl.run_audit_and_improve()
+
+            # NeuralNetHead scoring (correct usage)
+            scored_insights = self.neural_head.score_advice(mined_patterns[0] if mined_patterns else {"content": "cycle_summary"})
+
+            # Defense, KAS, Economic (in correct order)
+            hardened = self.defense.run_ahe_cycle()
+            kas_results = self.kas.recursive_hunt(hardened)
             polished_products = self.economic.polish_and_synthesize(kas_results)
-            
-            # 7. Lightweight nightly tasks + training data preparation + Distil SN97 sync
+
             self._run_lightweight_nightly_tasks(vaults, polished_products)
-            
-            # 8. Save polished artifacts to internal vaults
+
             save_to_vaults(polished_products, self.config.shared_vault_path, vault_name="internal")
-            
-            # 9. Check readiness for model distillation (continuously learning teacher)
+
             distillation_ready = self.distiller.check_readiness(polished_products)
-            
+
             self.last_loop = datetime.now()
-            logger.info(f"✅ Synapse daily cycle complete — {len(polished_products)} new/improved artifacts | Distillation ready: {distillation_ready}")
-            
-            return {
-                "status": "success",
-                "artifacts_generated": len(polished_products),
-                "distillation_ready": distillation_ready,
-                "timestamp": datetime.now().isoformat()
-            }
-            
+            logger.info(f"✅ Synapse daily cycle complete — {len(polished_products)} artifacts | Distillation ready: {distillation_ready}")
+            return {"status": "success", "artifacts_generated": len(polished_products), "distillation_ready": distillation_ready}
+
         except Exception as e:
             logger.error(f"❌ Synapse daily cycle failed: {e}")
             return {"status": "error", "error": str(e)}
 
     def _run_lightweight_nightly_tasks(self, vaults: Dict, polished_products: List[Dict]):
-        """Pruning, training data cleaning, market summary, health reporting + Distil SN97 sync."""
         prune_old_vaults(self.config.shared_vault_path, max_age_days=14)
-        self._clean_and_prepare_training_data(vaults, polished_products)
-        
+        # Training data prep is now handled inside Meta-RL Distillation Prep Vault — no duplication
         summary = self.economic.get_market_summary()
         logger.info(f"💰 Nightly market summary — Total value created: {summary.get('total_value_created', 0):.2f}")
-
-        # Distil SN97 update checker (stays on par with leading Bittensor subnet)
         self._check_distil_sn97_updates()
-
-        health_report = {
-            "timestamp": datetime.now().isoformat(),
-            "red_team_summary": self.defense.get_red_team_summary(),
-            "kas_fragments_added": len(polished_products),
-            "market_summary": summary
-        }
-        save_to_vaults([health_report], self.config.shared_vault_path, vault_name="nightly_reports")
 
     def _check_distil_sn97_updates(self):
         """Nightly check for updates to unarbos/distil (Distil SN97) — logs latest techniques."""

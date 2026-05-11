@@ -29,6 +29,17 @@ from solve.solve_fragment_scoring import SolveFragmentScoringModule   # Full sco
 
 logger = logging.getLogger(__name__)
 
+class DomainAdapter:
+    """Optimal lightweight domain adapter for semantic alignment across Enigma challenge domains.
+    Ensures defense results are domain-aware for Meta-RL polishing feedback.
+    """
+    def __init__(self):
+        self.known_domains = {"crypto", "quantum", "ai_robustness", "smart_contract", "incentive_mechanism", "general"}
+
+    def extract_domain_tag(self, telemetry: Dict) -> str:
+        """Extract domain tag from telemetry with safe defaults."""
+        return telemetry.get("domain_tag", "general")
+
 class DefenseRedTeam:
     def __init__(self, config: OperationsConfig = None):
         self.config = config or OperationsConfig()
@@ -37,6 +48,7 @@ class DefenseRedTeam:
         self.vault_path = Path("data/operations/redteam_vault")
         self.vault_path.mkdir(parents=True, exist_ok=True)
         self.mitigation_push_path = Path("data/defense_mitigations.json")
+        self.domain_adapter = DomainAdapter()
         logger.info("🛡️ DefenseRedTeam v0.9.13 MAXIMUM SOTA initialized — real sandboxed attacks protecting the entire SAGE system with explicit testing of SolveFragmentScoringModule")
 
     def run_ahe_cycle(self, telemetry: Dict = None) -> Dict[str, Any]:
@@ -57,12 +69,18 @@ class DefenseRedTeam:
         self._log_and_distribute(hardened_results, telemetry)
         self._push_mitigations_to_local_operations(hardened_results)
 
+        # Optimal upgrade: compute stability metric + negative examples for Meta-RL polishing loop
+        stability_score = self._compute_stability_metric(hardened_results, telemetry)
+        negative_examples = [r for r in hardened_results if r.get("hardening_effectiveness", 0.0) < 0.75]
+
         return {
             "status": "success",
             "hardened_components": len(hardened_results),
             "avg_hardening_effectiveness": round(np.mean([r.get("hardening_effectiveness", 0.0) for r in hardened_results]), 4) if hardened_results else 0.0,
             "timestamp": datetime.now().isoformat(),
-            "covered_layers": ["Operations", "Solve", "Strategy", "Intelligence", "Economic", "KAS", "Graph Mining", "MOPE", "Meta-RL", "Defense"]
+            "covered_layers": ["Operations", "Solve", "Strategy", "Intelligence", "Economic", "KAS", "Graph Mining", "MOPE", "Meta-RL", "Defense"],
+            "stability_score": stability_score,
+            "negative_examples": negative_examples  # directly consumable by Meta-RL polishing loop
         }
 
     def _gather_live_telemetry_from_all_layers(self) -> Dict:
@@ -184,6 +202,16 @@ except Exception:
         with open(push_path, "w") as f:
             json.dump({"mitigations": mitigations, "timestamp": datetime.now().isoformat()}, f, indent=2)
         logger.info(f"Meta-defense pushed {len(mitigations)} hardening rules to local Operations Layer")
+
+    def _compute_stability_metric(self, hardened_results: List[Dict], telemetry: Dict) -> float:
+        """Optimal lightweight stability metric for Meta-RL polishing loop feedback.
+        Rolling average of hardening effectiveness + telemetry signal.
+        """
+        if not hardened_results:
+            return 1.0
+        avg_hardening = np.mean([r.get("hardening_effectiveness", 0.0) for r in hardened_results])
+        telemetry_signal = np.mean([data.get("telemetry_signal", 0.0) for data in telemetry.get("components", {}).values()])
+        return round(0.6 * avg_hardening + 0.4 * telemetry_signal, 4)
 
     def red_team_and_harden(self, insights: List[Dict]) -> List[Dict]:
         return [self._adversarial_evaluate(i) for i in insights]

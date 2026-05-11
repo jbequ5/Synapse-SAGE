@@ -23,6 +23,35 @@ from utils import load_shared_vaults, save_to_vaults   # real helpers from repo
 
 logger = logging.getLogger(__name__)
 
+class DomainAdapter:
+    """Optimal lightweight domain adapter for semantic alignment across Enigma challenge domains.
+    Provides preference vector for Pareto-conditioned 5-objective balancing.
+    """
+    def __init__(self):
+        self.known_domains = {"crypto", "quantum", "ai_robustness", "smart_contract", "incentive_mechanism", "general"}
+        self.domain_preferences = {
+            "crypto": [0.6, 0.7, 0.8, 0.5, 0.9],      # value, quality, robustness, learning-to-learn, predictive
+            "quantum": [0.5, 0.6, 0.95, 0.7, 0.8],
+            "ai_robustness": [0.8, 0.75, 0.9, 0.85, 0.95],
+            "smart_contract": [0.7, 0.85, 0.85, 0.6, 0.75],
+            "incentive_mechanism": [0.9, 0.8, 0.7, 0.9, 0.85],
+            "general": [0.7, 0.7, 0.7, 0.7, 0.7]
+        }
+
+    def extract_domain_tag(self, fragment: Any) -> str:
+        """Extract domain tag from metadata with safe defaults."""
+        if isinstance(fragment, dict):
+            metadata = fragment.get('metadata', {})
+            return metadata.get('domain_tag', 'general')
+        metadata = getattr(fragment, 'metadata', {})
+        if isinstance(metadata, dict):
+            return metadata.get('domain_tag', 'general')
+        return 'general'
+
+    def get_preference_vector(self, domain: str) -> List[float]:
+        """Return 5-dimensional preference vector for Pareto-conditioned scoring."""
+        return self.domain_preferences.get(domain, self.domain_preferences["general"])
+
 class MetaRLLoop:
     def __init__(self, config: SynapseConfig = None):
         self.config = config or SynapseConfig()
@@ -30,6 +59,7 @@ class MetaRLLoop:
         self.training_batch_path = Path("data/training_batches")
         self.training_batch_path.mkdir(parents=True, exist_ok=True)
         self.audit_history = self._load_audit_history()
+        self.domain_adapter = DomainAdapter()
         logger.info("🔄 MetaRLLoop v0.9.13 MAXIMUM SOTA initialized — full 7-phase 5-objective vector-driven self-improvement brain (fully wired)")
 
     def _load_audit_history(self) -> List[Dict]:
@@ -104,11 +134,15 @@ class MetaRLLoop:
         }
 
     def _compute_five_objective_vector(self, subsystem_data: Dict) -> Dict:
-        """Phase 2: Real NeuralNetHead scoring (primary signal)."""
-        # Use first high-signal fragment or fallback
-        advice = subsystem_data.get("solve_fragments")[0] if subsystem_data.get("solve_fragments") else {"content": "meta_rl_cycle"}
+        """Phase 2: Real NeuralNetHead scoring (primary signal) with Pareto preference conditioning."""
+        # Extract domain tag from first high-signal fragment or fallback
+        advice = subsystem_data.get("solve_fragments")[0] if subsystem_data.get("solve_fragments") else {"content": "meta_rl_cycle", "metadata": {}}
+        domain = self.domain_adapter.extract_domain_tag(advice)
+        preference_vector = self.domain_adapter.get_preference_vector(domain)
+
         outcome = {"actual_impact": 0.92}  # real telemetry in full runs
-        return neural_net_head.score_advice(advice, outcome)
+        # Pass preference vector for optimal Pareto-conditioned 5-objective balancing
+        return neural_net_head.score_advice(advice, outcome, preference_vector=preference_vector)
 
     def _self_critique(self, neural_score: Dict):
         """Phase 3: Pattern detection."""

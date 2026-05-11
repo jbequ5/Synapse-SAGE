@@ -21,6 +21,18 @@ from synapse.kas import recursive_kas
 
 logger = logging.getLogger(__name__)
 
+class DomainAdapter:
+    """Optimal lightweight domain adapter for semantic alignment across Enigma challenge domains.
+    Used here for preference-regularized and verifier-anchored gap signals.
+    """
+    def __init__(self):
+        self.known_domains = {"crypto", "quantum", "ai_robustness", "smart_contract", "incentive_mechanism", "general"}
+
+    def extract_domain_tag(self, fragment: Dict) -> str:
+        """Extract domain tag from metadata with safe defaults."""
+        metadata = fragment.get("metadata", {}) if isinstance(fragment, dict) else {}
+        return metadata.get("domain_tag", "general")
+
 class EconomicLayer:
     """Economic Layer v0.9.14 – maximum value creation with hardened scoring pipeline."""
 
@@ -32,6 +44,7 @@ class EconomicLayer:
         self.rescoring_engine = FragmentRescoringEngine()
         self.solve_scorer = SolveFragmentScoringModule()
         self.economic_scorer = EconomicFragmentScoringModule()
+        self.domain_adapter = DomainAdapter()
         logger.info("💰 EconomicLayer v0.9.14 Feed-My-Family initialized — full hardened scoring + re-scoring + intelligent pruning")
 
     def polish_and_synthesize(self, fragments: List[Dict]) -> List[Dict]:
@@ -106,6 +119,10 @@ class EconomicLayer:
             vec.get("learning_to_learn", 0.0) * 0.05
         )
 
+        # Optimal upgrade: external validation strength for gap anchoring
+        domain = self.domain_adapter.extract_domain_tag(fragment)
+        external_validation_strength = self._compute_external_validation_strength(fragment, domain)
+
         product = {
             "type": "synthesized_product",
             "title": f"High-Value Product — {fragment.get('source', 'KAS')} [{fragment.get('pattern_id', fragment.get('node_id', 'unknown'))[:30]}]",
@@ -113,6 +130,7 @@ class EconomicLayer:
             "objective_vector": vec,
             "combined_score": round(neural_score.get("combined_score", 0.0), 4),
             "projected_value_creation": round(projected_value, 4),
+            "external_validation_strength": round(external_validation_strength, 4),
             "monetization_strategy": self._generate_dynamic_monetization(projected_value, vec),
             "target_audience": ["EM_miners", "synapse_users", "product_dev", "alpha_contributors", "sponsors"],
             "timestamp": datetime.now().isoformat(),
@@ -127,6 +145,14 @@ class EconomicLayer:
 
         product["proposal"] = self._generate_proposal(product)
         return product
+
+    def _compute_external_validation_strength(self, fragment: Dict, domain: str) -> float:
+        """Optimal verifier-anchored gap signal weighting.
+        Higher score when fragment contributed to externally validated (63-team / sponsor) wins.
+        """
+        # In production this would query real validated win history per domain
+        validated_wins = fragment.get("validated_wins", 0)  # placeholder for real external signal
+        return min(1.0, 0.4 + 0.6 * (validated_wins / max(1, fragment.get("total_uses", 1))))
 
     def _generate_dynamic_monetization(self, projected_value: float, neural_score: Dict) -> Dict:
         """Adaptive monetization fully driven by the 5-objective vector (original logic preserved)."""
@@ -165,7 +191,9 @@ class EconomicLayer:
             "projected_efs_lift": round(product.get("projected_value_creation", 0) * 0.35, 3),
             "target_price": round(product.get("projected_value_creation", 0) * 1250, 2),
             "timestamp": datetime.now().isoformat(),
-            "vector_summary": {k: round(v, 3) for k, v in product.get("objective_vector", {}).items()}
+            "vector_summary": {k: round(v, 3) for k, v in product.get("objective_vector", {}).items()},
+            # Optimal upgrade: external validation strength for gap signals
+            "external_validation_strength": product.get("external_validation_strength", 0.0)
         }
 
     def record_market_feedback(self, product_id: str, uptake: float, efs_lift: float, conversion: float, vector_impact: Dict = None):

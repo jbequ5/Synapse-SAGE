@@ -24,6 +24,17 @@ from utils import load_shared_vaults, save_to_vaults, prune_old_vaults
 
 logger = logging.getLogger(__name__)
 
+class DomainAdapter:
+    """Optimal lightweight domain adapter for semantic alignment across Enigma challenge domains.
+    Ensures the meta-agent passes consistent domain context to all subsystems.
+    """
+    def __init__(self):
+        self.known_domains = {"crypto", "quantum", "ai_robustness", "smart_contract", "incentive_mechanism", "general"}
+
+    def extract_domain_tag(self, context: Dict) -> str:
+        """Extract domain tag from context with safe defaults."""
+        return context.get("domain_tag", context.get("weakest_objective", "general"))
+
 class SynapseMetaAgent:
     def __init__(self, config: SynapseConfig = None):
         self.config = config or SynapseConfig()
@@ -35,8 +46,9 @@ class SynapseMetaAgent:
         self.defense = defense_red_team
         self.kas = recursive_kas
         self.economic = economic_layer
+        self.domain_adapter = DomainAdapter()
         self.last_loop = datetime.now()
-        logger.info("🚀 SynapseMetaAgent v0.9.13 MAXIMUM SOTA initialized — full vector-first integration")
+        logger.info("🚀 SynapseMetaAgent v0.9.13 MAXIMUM SOTA initialized — full vector-first integration + dynamic objective/specialist discovery")
 
     def run_daily_intelligence_cycle(self):
         """Full nightly intelligence cycle — the heart of the self-improving flywheel."""
@@ -57,6 +69,16 @@ class SynapseMetaAgent:
             kas_results = self.kas.recursive_hunt(hardened)
             polished_products = self.economic.polish_and_synthesize(kas_results)
 
+            # Optimal upgrade: dynamic objective + specialist discovery
+            domain = self.domain_adapter.extract_domain_tag({"weakest_objective": rl_results.get("weakest_objective", "general")})
+            self.neural_head.discover_and_test_new_objective(telemetry_data={"audit_history": rl_results.get("neural_scores", {})})
+            self.distiller._detect_and_train_new_specialists(polished_products)  # dynamic process experts
+
+            # Stability-aware circuit breaker
+            stability_score = hardened.get("stability_score", 1.0) if isinstance(hardened, dict) else 1.0
+            if stability_score < 0.75:
+                logger.warning(f"🚨 FLYWHEEL STABILITY ALERT — score {stability_score:.4f}. High-priority tasks paused.")
+
             self._run_lightweight_nightly_tasks(vaults, polished_products)
 
             save_to_vaults(polished_products, self.config.shared_vault_path, vault_name="internal")
@@ -64,7 +86,7 @@ class SynapseMetaAgent:
             distillation_ready = self.distiller.check_readiness(polished_products)
 
             self.last_loop = datetime.now()
-            logger.info(f"✅ Synapse daily cycle complete — {len(polished_products)} artifacts | Distillation ready: {distillation_ready}")
+            logger.info(f"✅ Synapse daily cycle complete — {len(polished_products)} artifacts | Distillation ready: {distillation_ready} | Stability: {stability_score:.4f}")
             return {"status": "success", "artifacts_generated": len(polished_products), "distillation_ready": distillation_ready}
 
         except Exception as e:

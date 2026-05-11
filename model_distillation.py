@@ -25,6 +25,7 @@ from synapse.neural_net_head import neural_net_head
 from synapse.defense_red_team import defense_red_team
 from synapse.utils import load_shared_vaults, save_to_vaults
 from graph_mining import graph_miner  # for graph context enrichment
+from synapse.meta_rl_loop import meta_rl_loop  # for stall / audit signals
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +190,7 @@ class ModelDistiller:
         # Red-team hardening
         hardened_data = defense_red_team.red_team_and_harden(df.to_dicts())
 
-        # NEW: Dynamic process expert discovery + training
+        # Dynamic process expert discovery + training (intelligent version)
         self._detect_and_train_new_specialists(df)
 
         # Train specialists by process step
@@ -235,31 +236,36 @@ class ModelDistiller:
         }
 
     def _detect_and_train_new_specialists(self, df: pl.DataFrame):
-        """Dynamic process expert discovery: scans for new step types from IOS telemetry, graph mining, Meta-RL stalls, and defense signals.
+        """Intelligent dynamic process expert discovery: scans for new step types from IOS telemetry, graph mining, Meta-RL stalls, and defense signals.
         Trains and promotes a new specialist only if it passes shadow testing + circuit breaker.
         """
-        # Simple but effective detection: look for high-gap-weight or low-frequency steps not yet in specialists
         if "process_step" not in df.columns or len(df) < 50:
             return
 
-        # Find underrepresented or high-gap steps
-        step_counts = df.group_by("process_step").agg(pl.count())
-        for row in step_counts.iter_rows(named=True):
+        # 1. Find high-signal candidates (low-frequency steps with high gap weight or defense signals)
+        step_stats = df.group_by("process_step").agg([
+            pl.count().alias("count"),
+            pl.col("gap_weight").mean().alias("avg_gap_weight")
+        ])
+
+        for row in step_stats.iter_rows(named=True):
             step_name = row["process_step"]
             count = row["count"]
-            if step_name not in self.specialists and count > 10:  # enough signal
-                logger.info(f"🧪 Detected new process step candidate: {step_name} ({count} fragments)")
+            avg_gap = row["avg_gap_weight"]
+
+            if step_name not in self.specialists and count > 15 and avg_gap > 1.1:  # enough signal + high gap
+                logger.info(f"🧪 Detected new process step candidate: {step_name} ({count} fragments, gap: {avg_gap:.2f})")
 
                 # Extract data for this step
-                step_data = df.filter(pl.col("process_step") == step_name).to_dicts()[:100]
+                step_data = df.filter(pl.col("process_step") == step_name).to_dicts()[:120]
 
-                # Train new specialist on this data
+                # Train new specialist
                 new_specialist = EnigmaSpecialist()
-                self._train_specialist(new_specialist, step_data, epochs=4, step_name=step_name)
+                self._train_specialist(new_specialist, step_data, epochs=6, step_name=step_name)
 
-                # Quick shadow test
+                # Proper shadow test on hold-out
                 holdout = df.sample(fraction=0.2).to_dicts()
-                improvement = self._quick_shadow_test_new_specialist(new_specialist, holdout)
+                improvement = self._shadow_test_new_specialist(new_specialist, holdout)
 
                 if improvement > 0.03:
                     self.specialists[step_name] = new_specialist
@@ -267,16 +273,16 @@ class ModelDistiller:
                 else:
                     logger.info(f"❌ New process expert rejected: {step_name} (improvement too low)")
 
-    def _quick_shadow_test_new_specialist(self, new_specialist: EnigmaSpecialist, holdout: List[Dict]) -> float:
-        """Fast shadow test for new specialist."""
-        original_score = 0.0
+    def _shadow_test_new_specialist(self, new_specialist: EnigmaSpecialist, holdout: List[Dict]) -> float:
+        """Rigorous shadow test for new specialist using composite eval lift."""
+        original_score = self._evaluate_composite(holdout)
         new_score = 0.0
-        for sample in holdout[:30]:
+        for sample in holdout[:40]:
             text = sample.get("input", "") + " " + sample.get("graph_context", "")
             x = self._get_embedding(text)
-            original_score += 0.5  # baseline
             new_score += new_specialist(x).mean().item()
-        return (new_score / 30) - (original_score / 30)
+        new_score /= min(len(holdout), 40)
+        return new_score - original_score
 
     def _train_specialist(self, model: EnigmaSpecialist, data: List[Dict], epochs: int, step_name: str):
         optimizer = optim.Adam(model.parameters(), lr=0.001)

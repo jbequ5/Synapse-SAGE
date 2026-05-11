@@ -81,7 +81,7 @@ class GraphMiner:
                     timestamp=frag.get("timestamp"),
                     provenance=frag.get("provenance", {}),
                     vault=vault_name,
-                    domain=self.domain_adapter.extract_domain_tag(frag),  # domain-aware
+                    domain=self.domain_adapter.extract_domain_tag(frag),
                     combined_score=frag.get("combined_score", 0.0)
                 )
 
@@ -109,7 +109,7 @@ class GraphMiner:
                 continue
 
             sim = self._cosine_similarity(vec, other_vec)
-            if sim > 0.65:  # tunable threshold
+            if sim > 0.65:
                 self.graph.add_edge(
                     node_id,
                     existing_id,
@@ -120,7 +120,7 @@ class GraphMiner:
 
     def _cosine_similarity(self, v1: Dict, v2: Dict) -> float:
         """Cosine similarity across the (dynamic) objective vector."""
-        keys = list(set(v1.keys()) & set(v2.keys()))  # support new dynamic objectives
+        keys = list(set(v1.keys()) & set(v2.keys()))
         if not keys:
             keys = ["implementation_quality", "prediction_accuracy", "value_creation", "learning_to_learn", "robustness"]
         a = np.array([v1.get(k, 0.5) for k in keys])
@@ -161,7 +161,7 @@ class GraphMiner:
         for p in patterns:
             vec = p.get("objective_vector", {})
             p["vector_strength"] = self._compute_vector_strength(vec)
-            p["synergy_bonus"] = 0.0  # can be enriched later with edge data
+            p["synergy_bonus"] = 0.0
 
             # Optimal defense-aware boost
             defense_boost = 0.0
@@ -173,7 +173,7 @@ class GraphMiner:
             p["final_rank_score"] = p["vector_strength"] * (1 + p["synergy_bonus"]) + defense_boost
 
         patterns.sort(key=lambda x: x["final_rank_score"], reverse=True)
-        return patterns[:50]  # top 50 highest-signal insights
+        return patterns[:50]
 
     def _compute_vector_strength(self, vec: Dict) -> float:
         """Geometric mean across the (now dynamic) objectives."""
@@ -191,7 +191,6 @@ class GraphMiner:
         all_vectors = [data.get("objective_vector", {}) for _, data in self.graph.nodes(data=True) if data.get("objective_vector")]
         if not all_vectors:
             return {}
-        # Dynamic keys support
         keys = set()
         for v in all_vectors:
             keys.update(v.keys())

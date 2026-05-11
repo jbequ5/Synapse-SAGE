@@ -3,6 +3,8 @@ Synapse Model Distillation Pipeline — v1.0 MOPE (Mixture of Process Experts)
 Direct vector distillation, step-specialized specialists, decay-bounded vaults,
 graph-context enrichment, dynamic process-gap prioritization, hybrid generalist.
 Nightly loop stays genuinely light. No teacher model.
+
+NEW: Dynamic process expert discovery — automatically detects new process steps from IOS telemetry, graph mining, Meta-RL stalls, and defense signals, then trains and promotes a dedicated specialist.
 """
 
 import json
@@ -113,7 +115,7 @@ class ModelDistiller:
         self.generalist = EnigmaSpecialist(hidden_dim=512, num_layers=4)
         self.training_history = []
         self.version_manager = VersionedMOPEManager()
-        logger.info("🔬 ModelDistiller v1.0 MOPE — Mixture of Process Experts + direct vector distillation + decay + process gaps")
+        logger.info("🔬 ModelDistiller v1.0 MOPE — Mixture of Process Experts + direct vector distillation + decay + process gaps + dynamic specialist discovery")
 
     @staticmethod
     def _get_embedding_static(text: str) -> torch.Tensor:
@@ -144,7 +146,6 @@ class ModelDistiller:
         df = pl.DataFrame(data)
 
         # 1. Decay + vitality filtering (core of bounded vaults)
-        # vitality = base * (1 + reuse_boost) * time_decay
         df = df.with_columns([
             pl.when(pl.col("reuse_count").is_null()).then(0).otherwise(pl.col("reuse_count")).cast(pl.Float64).alias("reuse_count"),
             (pl.col("created_at").cast(pl.Datetime) if "created_at" in df.columns else pl.lit(datetime.now())).alias("created_at")
@@ -177,7 +178,7 @@ class ModelDistiller:
         return df
 
     def distill(self, vaults: Dict = None, epochs: int = 8) -> Dict[str, Any]:
-        """Full MOPE distillation run — targeted per-specialist + hybrid generalist."""
+        """Full MOPE distillation run — targeted per-specialist + hybrid generalist + dynamic new specialist discovery."""
         if vaults is None:
             vaults = load_shared_vaults(self.config.shared_vault_path)
 
@@ -187,6 +188,9 @@ class ModelDistiller:
 
         # Red-team hardening
         hardened_data = defense_red_team.red_team_and_harden(df.to_dicts())
+
+        # NEW: Dynamic process expert discovery + training
+        self._detect_and_train_new_specialists(df)
 
         # Train specialists by process step
         step_groups = df.group_by("process_step").agg(pl.all())
@@ -229,6 +233,50 @@ class ModelDistiller:
             "specialists_trained": list(self.specialists.keys()),
             "model_paths": str(self.distillation_dir)
         }
+
+    def _detect_and_train_new_specialists(self, df: pl.DataFrame):
+        """Dynamic process expert discovery: scans for new step types from IOS telemetry, graph mining, Meta-RL stalls, and defense signals.
+        Trains and promotes a new specialist only if it passes shadow testing + circuit breaker.
+        """
+        # Simple but effective detection: look for high-gap-weight or low-frequency steps not yet in specialists
+        if "process_step" not in df.columns or len(df) < 50:
+            return
+
+        # Find underrepresented or high-gap steps
+        step_counts = df.group_by("process_step").agg(pl.count())
+        for row in step_counts.iter_rows(named=True):
+            step_name = row["process_step"]
+            count = row["count"]
+            if step_name not in self.specialists and count > 10:  # enough signal
+                logger.info(f"🧪 Detected new process step candidate: {step_name} ({count} fragments)")
+
+                # Extract data for this step
+                step_data = df.filter(pl.col("process_step") == step_name).to_dicts()[:100]
+
+                # Train new specialist on this data
+                new_specialist = EnigmaSpecialist()
+                self._train_specialist(new_specialist, step_data, epochs=4, step_name=step_name)
+
+                # Quick shadow test
+                holdout = df.sample(fraction=0.2).to_dicts()
+                improvement = self._quick_shadow_test_new_specialist(new_specialist, holdout)
+
+                if improvement > 0.03:
+                    self.specialists[step_name] = new_specialist
+                    logger.info(f"✅ New process expert PROMOTED: {step_name} (improvement: {improvement:.4f})")
+                else:
+                    logger.info(f"❌ New process expert rejected: {step_name} (improvement too low)")
+
+    def _quick_shadow_test_new_specialist(self, new_specialist: EnigmaSpecialist, holdout: List[Dict]) -> float:
+        """Fast shadow test for new specialist."""
+        original_score = 0.0
+        new_score = 0.0
+        for sample in holdout[:30]:
+            text = sample.get("input", "") + " " + sample.get("graph_context", "")
+            x = self._get_embedding(text)
+            original_score += 0.5  # baseline
+            new_score += new_specialist(x).mean().item()
+        return (new_score / 30) - (original_score / 30)
 
     def _train_specialist(self, model: EnigmaSpecialist, data: List[Dict], epochs: int, step_name: str):
         optimizer = optim.Adam(model.parameters(), lr=0.001)

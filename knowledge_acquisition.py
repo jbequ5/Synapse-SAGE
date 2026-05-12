@@ -29,6 +29,7 @@ from defense_red_team import defense_red_team
 from economic_layer import economic_layer
 from utils import load_shared_vaults, save_to_vaults
 from model_distillation import model_distiller
+from surrogate_manager import surrogate_manager  # <-- minimal addition for SOTA heavy-simulation support
 
 logger = logging.getLogger(__name__)
 

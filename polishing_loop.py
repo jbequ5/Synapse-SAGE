@@ -8,6 +8,7 @@ from synapse.fragment_rescoring import FragmentRescoringEngine
 from synapse.economic_layer import economic_layer
 from synapse.utils import load_shared_vaults, save_to_vaults
 from synapse.defense_red_team import defense_red_team   # for stability integration
+from surrogate_manager import surrogate_manager  # <-- minimal addition for surrogate error signal in polishing
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,11 @@ def run_synapse_polishing_loop(days_running: int = 30):
     defense_report = defense_red_team.run_ahe_cycle()
     stability_score = defense_report.get("stability_score", 1.0)
     negative_examples = defense_report.get("negative_examples", [])
+
+    # New: Surrogate error signal for polishing stability
+    surrogate_error = surrogate_manager.get_surrogate_error_signal()
+    if surrogate_error > 0.15:
+        logger.warning(f"🚨 SURROGATE ERROR ALERT — {surrogate_error:.4f}. High uncertainty in simulation loop.")
 
     if stability_score < 0.75:
         logger.warning(f"🚨 FLYWHEEL STABILITY ALERT — score {stability_score:.4f}. Negative examples detected. Pausing high-priority escalation.")

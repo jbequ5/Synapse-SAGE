@@ -18,6 +18,7 @@ from synapse.graph_mining import graph_miner
 from synapse.meta_rl_loop import meta_rl_loop
 from synapse.neural_net_head import neural_net_head
 from synapse.kas import recursive_kas
+from surrogate_manager import surrogate_manager  # <-- minimal addition for surrogate error signal in product scoring
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,9 @@ class EconomicLayer:
         red_team_risk = fragment.get("red_team_risk", 0.0) if isinstance(fragment.get("red_team_risk"), (int, float)) else 0.0
         kas_freshness = recursive_kas.assess_freshness(fragment)
 
+        # New: Surrogate error signal for better value estimation
+        surrogate_error = surrogate_manager.get_surrogate_error_signal()
+
         vec = neural_score.get("objective_vector", {}) if isinstance(neural_score, dict) else neural_score
 
         projected_value = (
@@ -116,7 +120,8 @@ class EconomicLayer:
             vec.get("robustness", 0.0) * 0.20 +
             (1.0 - red_team_risk) * 0.10 +
             kas_freshness * 0.05 +
-            vec.get("learning_to_learn", 0.0) * 0.05
+            vec.get("learning_to_learn", 0.0) * 0.05 -
+            surrogate_error * 0.05  # penalize high surrogate uncertainty
         )
 
         # Optimal upgrade: external validation strength for gap anchoring
@@ -139,7 +144,8 @@ class EconomicLayer:
                 "kas_recursion_depth": getattr(recursive_kas, "recursion_depth", 0),
                 "red_team_risk": red_team_risk,
                 "strongest_objectives": strongest_objectives,
-                "freshness": kas_freshness
+                "freshness": kas_freshness,
+                "surrogate_error": round(surrogate_error, 4)
             }
         }
 

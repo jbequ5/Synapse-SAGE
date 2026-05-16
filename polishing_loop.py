@@ -9,7 +9,10 @@ from synapse.economic_layer import economic_layer
 from synapse.utils import load_shared_vaults, save_to_vaults
 from synapse.defense_red_team import defense_red_team   # for stability integration
 from surrogate_manager import surrogate_manager  # <-- minimal addition for surrogate error signal in polishing
-
+# 5. PINO distillation (new custom surrogates + MoDE specialists)
+from synapse.pino_distillation import run_pino_distillation
+distillation_stats = run_pino_distillation(days_running=days_running)
+logger.info(f"📈 PINO distillation stats: {distillation_stats}")
 logger = logging.getLogger(__name__)
 
 def run_synapse_polishing_loop(days_running: int = 30):

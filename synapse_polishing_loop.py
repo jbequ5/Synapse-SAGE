@@ -10,7 +10,7 @@ from synapse.utils import load_shared_vaults, save_to_vaults
 from synapse.defense_red_team import defense_red_team
 from surrogate_manager import surrogate_manager
 
-# PINO distillation engine (new custom surrogates + MoDE specialists)
+# PINO distillation (new MoDE specialists + custom surrogates)
 from synapse.pino_distillation import PINODistillationEngine
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def run_synapse_polishing_loop(days_running: int = 30):
     polished_products = economic_layer.polish_and_synthesize(updated_fragments)
 
     # 4. PINO distillation — creates new MoDE specialists and custom surrogate entries in the bank
-    #    This is the core of the surrogate evolution layer and runs on high-yield fragments only
+    #    This is the core surrogate evolution layer and runs on high-yield fragments only
     distillation_engine = PINODistillationEngine(
         mope_mixture=global_mope_mixture,
         mode_mixture=global_mode_mixture,
@@ -50,7 +50,7 @@ def run_synapse_polishing_loop(days_running: int = 30):
     stability_score = defense_report.get("stability_score", 1.0)
     negative_examples = defense_report.get("negative_examples", [])
 
-    # New: Surrogate error signal for polishing stability
+    # Surrogate error signal for polishing stability
     surrogate_error = surrogate_manager.get_surrogate_error_signal()
     if surrogate_error > 0.15:
         logger.warning(f"🚨 SURROGATE ERROR ALERT — {surrogate_error:.4f}. High uncertainty in simulation loop.")
@@ -66,4 +66,4 @@ def run_synapse_polishing_loop(days_running: int = 30):
         logger.info(f"🚀 {len(high_priority)} high-priority gaps escalated for deeper KAS hunts")
 
     logger.info(f"✅ Synapse polishing loop completed — {len(polished_products)} products in internal vaults | Stability: {stability_score:.4f}")
-    return polished_productsq
+    return polished_products
